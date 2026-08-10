@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LocalSendDotNet.Core/LocalSendDotNet.Core.csproj" />
+    <Project Path="src/LocalSendDotNet.Cli/LocalSendDotNet.Cli.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LocalSendDotNet.Core.Tests/LocalSendDotNet.Core.Tests.csproj" />
+    <Project Path="tests/LocalSendDotNet.InteropTests/LocalSendDotNet.InteropTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+artifacts/
+.vs/
+.vscode/
+*.user
+*.suo
+TestResults/
+coverage/
+*.pfx
+identity-certificate.pem
+identity-private-key.pem

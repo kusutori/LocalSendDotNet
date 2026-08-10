@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>localsend-dotnet</AssemblyName>
+    <RootNamespace>LocalSendDotNet.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../LocalSendDotNet.Core/LocalSendDotNet.Core.csproj" />
+  </ItemGroup>
+</Project>

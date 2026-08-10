@@ -7,13 +7,58 @@ namespace LocalSendDotNet;
 
 internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions options)
 {
+    public async Task<(RegisterResponseDto Info, string Fingerprint, bool Verified)> ProbeAsync(DeviceEndpoint endpoint, CancellationToken cancellationToken)
+    {
+        string? certificateFingerprint = null;
+        using var handler = new HttpClientHandler();
+        if (endpoint.Protocol == LocalSendProtocol.Https)
+        {
+            handler.ClientCertificates.Add(identity.Certificate);
+            handler.ServerCertificateCustomValidationCallback = (_, certificate, _, _) =>
+            {
+                if (certificate is null)
+                    throw new PeerIdentityException("The HTTPS peer did not provide a certificate.");
+                using var converted = X509CertificateLoader.LoadCertificate(certificate.Export(X509ContentType.Cert));
+                if (!DeviceIdentityStore.ValidatePeerCertificate(converted, null))
+                    throw new PeerIdentityException("The peer certificate is expired or is not a valid self-signed identity.");
+                certificateFingerprint = DeviceIdentityStore.Fingerprint(converted);
+                return true;
+            };
+        }
+        using var client = new HttpClient(handler, disposeHandler: false)
+        {
+            BaseAddress = new Uri($"{(endpoint.Protocol == LocalSendProtocol.Https ? "https" : "http")}://{FormatHost(endpoint.Address)}:{endpoint.Port}"),
+            Timeout = options.RequestTimeout
+        };
+        RegisterResponseDto info;
+        try
+        {
+            info = await client.GetFromJsonAsync<RegisterResponseDto>(V2Constants.BasePath + "/info", V2Json.Options, cancellationToken).ConfigureAwait(false)
+                ?? throw new LocalSendException("The peer returned an empty info response.");
+        }
+        catch (HttpRequestException exception) when (ContainsPeerIdentityException(exception))
+        {
+            throw new PeerIdentityException("The peer failed TLS identity validation.", exception);
+        }
+        var fingerprint = certificateFingerprint ?? info.Fingerprint;
+        if (string.IsNullOrWhiteSpace(fingerprint))
+            throw new PeerIdentityException("The peer did not provide an identity fingerprint.");
+        if (certificateFingerprint is not null && !string.IsNullOrEmpty(info.Fingerprint) &&
+            !StringComparer.OrdinalIgnoreCase.Equals(certificateFingerprint, info.Fingerprint))
+            throw new PeerIdentityException("The peer's advertised fingerprint did not match its TLS certificate.");
+        return (info, fingerprint, certificateFingerprint is not null);
+    }
+
     public async Task<RegisterResponseDto> RegisterAsync(DeviceEndpoint endpoint, string expectedFingerprint, DeviceInfoDto localInfo, CancellationToken cancellationToken)
     {
         using var client = CreateClient(endpoint, expectedFingerprint);
         using var response = await client.PostAsJsonAsync(V2Constants.BasePath + "/register", localInfo, V2Json.Options, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<RegisterResponseDto>(V2Json.Options, cancellationToken).ConfigureAwait(false)
+        var result = await response.Content.ReadFromJsonAsync<RegisterResponseDto>(V2Json.Options, cancellationToken).ConfigureAwait(false)
             ?? throw new LocalSendException("The peer returned an empty register response.");
+        if (!string.IsNullOrEmpty(result.Fingerprint) && !StringComparer.OrdinalIgnoreCase.Equals(result.Fingerprint, expectedFingerprint))
+            throw new PeerIdentityException("The peer's register response fingerprint did not match the trusted identity.");
+        return result;
     }
 
     public async Task<PrepareUploadResponseDto> PrepareUploadAsync(DeviceEndpoint endpoint, string expectedFingerprint, PrepareUploadRequestDto request, string? pin, CancellationToken cancellationToken)
@@ -24,9 +69,16 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
         if (response.StatusCode == HttpStatusCode.Unauthorized)
             throw new PinRequiredException(pin is not null);
         if (response.StatusCode == HttpStatusCode.TooManyRequests)
+        {
+            ErrorResponseDto? error = null;
+            try { error = await response.Content.ReadFromJsonAsync<ErrorResponseDto>(V2Json.Options, cancellationToken).ConfigureAwait(false); }
+            catch (System.Text.Json.JsonException) { }
+            if (error?.Message.Contains("maximum", StringComparison.OrdinalIgnoreCase) == true)
+                throw new PeerBusyException();
             throw new PinRateLimitedException();
+        }
         if (response.StatusCode == HttpStatusCode.Forbidden)
-            throw new LocalSendException("The remote device declined the transfer.");
+            throw new TransferDeclinedException();
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<PrepareUploadResponseDto>(V2Json.Options, cancellationToken).ConfigureAwait(false)
             ?? throw new LocalSendException("The peer returned an empty prepare-upload response.");
@@ -34,7 +86,7 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
 
     public async Task UploadAsync(DeviceEndpoint endpoint, string fingerprint, string sessionId, string fileId, string token, Stream content, long length, string contentType, CancellationToken cancellationToken)
     {
-        using var client = CreateClient(endpoint, fingerprint, timeout: Timeout.InfiniteTimeSpan);
+        using var client = CreateClient(endpoint, fingerprint, timeout: options.UploadTimeout);
         var path = $"{V2Constants.BasePath}/upload?sessionId={Uri.EscapeDataString(sessionId)}&fileId={Uri.EscapeDataString(fileId)}&token={Uri.EscapeDataString(token)}";
         using var body = new StreamContent(content);
         body.Headers.ContentLength = length;
@@ -58,7 +110,9 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
         if (endpoint.Protocol == LocalSendProtocol.Https)
         {
             handler.ClientCertificates.Add(identity.Certificate);
-            handler.ServerCertificateCustomValidationCallback = (_, certificate, _, _) => ValidateCertificate(certificate, expectedFingerprint);
+            handler.ServerCertificateCustomValidationCallback = (_, certificate, _, _) => ValidateCertificate(certificate, expectedFingerprint)
+                ? true
+                : throw new PeerIdentityException("The remote TLS certificate did not match the announced fingerprint.");
         }
         return new HttpClient(handler, disposeHandler: true)
         {
@@ -76,5 +130,13 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
             return DeviceIdentityStore.ValidatePeerCertificate(certificate2, expectedFingerprint);
         using var converted = X509CertificateLoader.LoadCertificate(certificate.Export(X509ContentType.Cert));
         return DeviceIdentityStore.ValidatePeerCertificate(converted, expectedFingerprint);
+    }
+
+    private static bool ContainsPeerIdentityException(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+            if (current is PeerIdentityException)
+                return true;
+        return false;
     }
 }

@@ -14,12 +14,14 @@ internal static class SafeFileTarget
             throw new LocalSendException($"Unsafe incoming path: {requestedName}");
 
         var sanitized = components.Select(SanitizeComponent).ToArray();
+        EnsureNoLinkedDirectories(rootFull, sanitized[..^1]);
         var candidate = Path.GetFullPath(Path.Combine([rootFull, .. sanitized]));
         var prefix = rootFull.EndsWith(Path.DirectorySeparatorChar) ? rootFull : rootFull + Path.DirectorySeparatorChar;
         if (!candidate.StartsWith(prefix, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             throw new LocalSendException($"Incoming path escapes the destination: {requestedName}");
 
         Directory.CreateDirectory(Path.GetDirectoryName(candidate)!);
+        EnsureNoLinkedDirectories(rootFull, sanitized[..^1]);
         if (!File.Exists(candidate) && (reserved is null || reserved.Add(candidate)))
             return candidate;
 
@@ -38,9 +40,32 @@ internal static class SafeFileTarget
     {
         var invalid = Path.GetInvalidFileNameChars();
         var chars = value.Select(c => char.IsControl(c) || invalid.Contains(c) ? '_' : c).ToArray();
-        var sanitized = new string(chars).Trim();
+        var sanitized = new string(chars).Trim().TrimEnd('.', ' ');
         if (sanitized.Length == 0 || sanitized is "." or "..")
             throw new LocalSendException($"Unsafe incoming filename component: {value}");
+        if (OperatingSystem.IsWindows())
+        {
+            var stem = sanitized.Split('.')[0];
+            if (stem.Equals("CON", StringComparison.OrdinalIgnoreCase) || stem.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
+                stem.Equals("AUX", StringComparison.OrdinalIgnoreCase) || stem.Equals("NUL", StringComparison.OrdinalIgnoreCase) ||
+                (stem.Length == 4 && (stem.StartsWith("COM", StringComparison.OrdinalIgnoreCase) || stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) &&
+                 stem[3] is >= '1' and <= '9'))
+                sanitized = "_" + sanitized;
+        }
         return sanitized;
+    }
+
+    private static void EnsureNoLinkedDirectories(string root, IEnumerable<string> components)
+    {
+        var current = root;
+        foreach (var component in components)
+        {
+            current = Path.Combine(current, component);
+            if (!Directory.Exists(current))
+                continue;
+            var info = new DirectoryInfo(current);
+            if (info.LinkTarget is not null || info.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                throw new LocalSendException($"Incoming path traverses a linked directory: {component}");
+        }
     }
 }

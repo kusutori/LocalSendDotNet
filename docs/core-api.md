@@ -1,0 +1,31 @@
+# Core API guide
+
+`LocalSendNode` is the version-independent application boundary. Protocol v2 DTOs and routes remain internal so a future v3 adapter can preserve this calling model.
+
+## Lifecycle and identity
+
+Create one node for the lifetime of the host application. `StartAsync` loads or creates the persistent certificate identity, starts HTTPS and discovery, and completes after the first announcement burst. A stopped node is intentionally not restartable; dispose it and create a new instance. `State`, `Identity`, and `WatchStateChangesAsync` are suitable for application status indicators.
+
+The library never writes to the console and does not switch synchronization contexts. Supply an `ILoggerFactory` for diagnostics. Callers decide how `IProgress<TransferProgress>` callbacks are marshalled to their UI thread.
+
+## Devices
+
+Use `GetDevices()` for an initial snapshot and `WatchDeviceChangesAsync()` for additions, updates, and removals. Devices expire after `DeviceExpiration` when no new announcement or registration is seen. HTTPS is preferred by `LocalSendDevice.PreferredEndpoint`.
+
+For a manually entered address, call `ProbeDeviceAsync(endpoint)` first. HTTPS probes validate that the certificate is current, self-signed consistently, and agrees with the fingerprint returned by `/info`; the returned fingerprint is still trust-on-first-use and should be shown for user confirmation. After confirmation, call `AddKnownDeviceAsync(endpoint, fingerprint)`. Manually trusted devices remain in the in-memory list until `RemoveDevice` or node disposal instead of expiring with multicast peers. HTTP probes cannot cryptographically verify identity and return `IdentityVerified == false`.
+
+## Sending
+
+Use `SendFileItem`, `SendTextItem`, or `SendStreamItem`. The stream factory makes sandboxed file pickers and virtual content usable without an intermediate file. `LocalSendItems.FromDirectory` builds items with protocol-safe relative names. `SendOptions.ComputeSha256` performs a complete pre-read and includes the digest in prepare-upload; enable it when integrity is more important than avoiding a second read.
+
+`SendAsync` reports a transfer ID in its first progress callback. Retain that ID to call `CancelTransferAsync`. Cancellation also attempts the remote `/cancel` route with a short bounded timeout. PIN-required and PIN-rate-limited responses use dedicated exceptions; normal transport failures are returned as `TransferResult` with a code from `TransferFailureCodes`.
+
+## Receiving
+
+`WatchIncomingTransfersAsync` is a reliable bounded stream: when a subscriber is slow, producers wait instead of silently dropping a request requiring a decision. Call `AcceptAsync` with item IDs for partial acceptance or `DeclineAsync`. Unknown IDs are rejected before a decision is sent.
+
+Accepted files are streamed to `.part-*`, length-checked, optionally SHA-256 checked, and atomically renamed. Absolute paths, traversal, linked subdirectories, and platform-invalid names are rejected. Abandoned accepted sessions fail after `IncomingTransferTimeout`, release their concurrency slot, and remove temporary files. When all slots are occupied, new sessions receive an immediate busy response instead of waiting indefinitely.
+
+## Limits
+
+Important host-controlled limits include `MaxConcurrentTransfers`, `MaxConcurrentFileUploads`, `MaxIncomingItemsPerTransfer`, `MaxIncomingTransferBytes`, `MaxPrepareRequestBytes`, `IncomingDecisionTimeout`, `IncomingTransferTimeout`, `UploadTimeout`, and `CancelRequestTimeout`. Defaults favor normal LAN transfers; applications accepting files from less trusted networks should choose tighter byte and item limits.

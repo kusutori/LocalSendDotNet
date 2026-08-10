@@ -11,6 +11,9 @@
 - Stable RSA identity and uppercase SHA-256 DER fingerprint
 - Mutual TLS transfer between two in-process nodes
 - Streaming file body, partial selection, safe destination paths and collision handling
+- Concurrent uploads, abandoned-session expiry, aggregate progress and bounded session admission
+- Hexadecimal/Base64 SHA-256 validation before atomic publication
+- Periodic announcements, stale-device removal and trusted manual HTTPS probing
 
 ## Manual official-client matrix
 

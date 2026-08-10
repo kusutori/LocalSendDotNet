@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using LocalSendDotNet.Protocol;
 using LocalSendDotNet.Protocol.V2;
 using Microsoft.Extensions.Logging;
@@ -15,18 +16,24 @@ public sealed class LocalSendNode : IAsyncDisposable
     private readonly ILogger _logger;
     private readonly ILocalSendProtocolAdapter _protocol = new V2ProtocolAdapter();
     private readonly BroadcastHub<DeviceChange> _deviceChanges = new(128);
-    private readonly BroadcastHub<IncomingTransferRequest> _incomingTransfers = new(64);
+    private readonly BroadcastHub<IncomingTransferRequest> _incomingTransfers = new(64, dropOldest: false);
+    private readonly BroadcastHub<LocalSendNodeStateChange> _stateChanges = new(32);
     private readonly ConcurrentDictionary<Guid, IncomingSession> _pending = new();
     private readonly ConcurrentDictionary<string, IncomingSession> _incomingSessions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (IPAddress Address, CancellationTokenSource Cancellation)> _outgoingSessions = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _activeOutgoing = new();
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
+    private readonly object _stateGate = new();
     private readonly SemaphoreSlim _transferSlots;
+    private readonly SemaphoreSlim _uploadSlots;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly DeviceStore _devices;
     private DeviceIdentity? _identity;
     private V2HttpClient? _client;
     private V2Server? _server;
     private V2MulticastDiscovery? _discovery;
+    private Task? _maintenance;
+    private LocalSendNodeState _state = LocalSendNodeState.Created;
     private bool _started;
     private bool _stopped;
     private bool _disposed;
@@ -38,7 +45,14 @@ public sealed class LocalSendNode : IAsyncDisposable
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<LocalSendNode>();
         _devices = new DeviceStore(_deviceChanges);
         _transferSlots = new SemaphoreSlim(options.MaxConcurrentTransfers, options.MaxConcurrentTransfers);
+        _uploadSlots = new SemaphoreSlim(options.MaxConcurrentFileUploads, options.MaxConcurrentFileUploads);
     }
+
+    public LocalSendNodeState State { get { lock (_stateGate) return _state; } }
+
+    public LocalSendIdentity? Identity => _identity is null ? null : new(
+        _options.Alias, V2Constants.Version, _options.DeviceModel, _options.DeviceType, _identity.Fingerprint,
+        _options.Port, _options.EnableHttps ? LocalSendProtocol.Https : LocalSendProtocol.Http);
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
@@ -50,6 +64,7 @@ public sealed class LocalSendNode : IAsyncDisposable
                 return;
             if (_stopped)
                 throw new InvalidOperationException("A stopped LocalSendNode cannot be restarted; create a new node instance.");
+            SetState(LocalSendNodeState.Starting);
             Directory.CreateDirectory(_options.DownloadDirectory);
             _identity = await DeviceIdentityStore.LoadOrCreateAsync(_options.DataDirectory, cancellationToken).ConfigureAwait(false);
             _client = new V2HttpClient(_identity, _options);
@@ -59,13 +74,20 @@ public sealed class LocalSendNode : IAsyncDisposable
             {
                 _discovery = new V2MulticastDiscovery(_options, () => CreateLocalInfo(announce: true), OnAnnouncementAsync, _logger);
                 await _discovery.StartAsync(cancellationToken).ConfigureAwait(false);
-                _started = true;
                 await _discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false);
+                _started = true;
+                SetState(LocalSendNodeState.Running);
+                _maintenance = MaintainAsync(_lifetime.Token);
             }
-            catch
+            catch (Exception exception)
             {
+                if (_discovery is not null)
+                    await _discovery.DisposeAsync().ConfigureAwait(false);
                 await _server.DisposeAsync().ConfigureAwait(false);
+                _discovery = null;
                 _server = null;
+                _started = false;
+                SetState(LocalSendNodeState.Faulted, exception);
                 throw;
             }
         }
@@ -79,6 +101,7 @@ public sealed class LocalSendNode : IAsyncDisposable
         {
             if (!_started && _server is null)
                 return;
+            SetState(LocalSendNodeState.Stopping);
             await _lifetime.CancelAsync().ConfigureAwait(false);
             foreach (var session in _pending.Values)
                 session.Decision.TrySetResult(new(false, null));
@@ -89,6 +112,11 @@ public sealed class LocalSendNode : IAsyncDisposable
             }
             foreach (var outgoing in _outgoingSessions.Values)
                 await outgoing.Cancellation.CancelAsync().ConfigureAwait(false);
+            if (_maintenance is not null)
+            {
+                try { await _maintenance.ConfigureAwait(false); }
+                catch (OperationCanceledException) { }
+            }
             if (_discovery is not null)
                 await _discovery.DisposeAsync().ConfigureAwait(false);
             if (_server is not null)
@@ -97,6 +125,7 @@ public sealed class LocalSendNode : IAsyncDisposable
             _server = null;
             _started = false;
             _stopped = true;
+            SetState(LocalSendNodeState.Stopped);
             _deviceChanges.Complete();
             _incomingTransfers.Complete();
         }
@@ -111,9 +140,61 @@ public sealed class LocalSendNode : IAsyncDisposable
 
     public IReadOnlyList<LocalSendDevice> GetDevices() => _devices.Snapshot();
 
+    public IAsyncEnumerable<LocalSendNodeStateChange> WatchStateChangesAsync(CancellationToken cancellationToken = default) => _stateChanges.Subscribe(cancellationToken);
+
     public IAsyncEnumerable<DeviceChange> WatchDeviceChangesAsync(CancellationToken cancellationToken = default) => _deviceChanges.Subscribe(cancellationToken);
 
     public IAsyncEnumerable<IncomingTransferRequest> WatchIncomingTransfersAsync(CancellationToken cancellationToken = default) => _incomingTransfers.Subscribe(cancellationToken);
+
+    public async Task<LocalSendDevice> AddKnownDeviceAsync(DeviceEndpoint endpoint, string fingerprint, CancellationToken cancellationToken = default)
+    {
+        EnsureStarted();
+        ArgumentNullException.ThrowIfNull(endpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+        RegisterResponseDto response;
+        try { response = await _client!.RegisterAsync(endpoint, fingerprint, CreateLocalInfo(), cancellationToken).ConfigureAwait(false); }
+        catch (HttpRequestException exception) when (ClassifyFailure(exception, string.Empty) == TransferFailureCodes.PeerIdentity)
+        {
+            throw new PeerIdentityException("The peer failed TLS identity validation.", exception);
+        }
+        var device = new LocalSendDevice(response.Alias, response.Version, response.DeviceModel,
+            V2ProtocolAdapter.ParseDeviceType(response.DeviceType), fingerprint, response.Download, [endpoint], DateTimeOffset.UtcNow);
+        return _devices.Upsert(device, persistent: true);
+    }
+
+    public async Task<DeviceProbeResult> ProbeDeviceAsync(DeviceEndpoint endpoint, CancellationToken cancellationToken = default)
+    {
+        EnsureStarted();
+        ArgumentNullException.ThrowIfNull(endpoint);
+        var result = await _client!.ProbeAsync(endpoint, cancellationToken).ConfigureAwait(false);
+        var device = new LocalSendDevice(result.Info.Alias, result.Info.Version, result.Info.DeviceModel,
+            V2ProtocolAdapter.ParseDeviceType(result.Info.DeviceType), result.Fingerprint, result.Info.Download, [endpoint], DateTimeOffset.UtcNow);
+        return new(device, result.Verified);
+    }
+
+    public bool RemoveDevice(string fingerprint)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+        return _devices.Remove(fingerprint);
+    }
+
+    public async Task<bool> CancelTransferAsync(Guid transferId, CancellationToken cancellationToken = default)
+    {
+        EnsureStarted();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_activeOutgoing.TryGetValue(transferId, out var outgoing))
+        {
+            await outgoing.CancelAsync().ConfigureAwait(false);
+            return true;
+        }
+        var incoming = _pending.Values.Concat(_incomingSessions.Values).FirstOrDefault(session => session.TransferId == transferId);
+        if (incoming is null)
+            return false;
+        incoming.Decision.TrySetResult(new(false, null));
+        await incoming.Cancellation.CancelAsync().ConfigureAwait(false);
+        incoming.Cancel();
+        return true;
+    }
 
     public async Task<TransferResult> SendAsync(
         LocalSendDevice device,
@@ -127,64 +208,67 @@ public sealed class LocalSendNode : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(items);
         if (items.Count == 0)
             throw new ArgumentException("At least one item is required.", nameof(items));
+        options ??= new SendOptions();
         var endpoint = device.Endpoints.OrderByDescending(static x => x.Protocol == LocalSendProtocol.Https).FirstOrDefault()
             ?? throw new LocalSendException("The device has no usable v2 endpoint.");
         var transferId = Guid.NewGuid();
-        var itemMap = items.Select(item => (Id: Guid.NewGuid().ToString("N"), Item: item)).ToArray();
-        var totalBytes = itemMap.Sum(static x => x.Item.Length);
-        progress?.Report(new(transferId, null, TransferDirection.Send, TransferState.Preparing, 0, totalBytes));
-
-        var dto = new PrepareUploadRequestDto
-        {
-            Info = CreateLocalInfo(),
-            Files = itemMap.ToDictionary(static x => x.Id, static x => ToFileDto(x.Id, x.Item), StringComparer.Ordinal)
-        };
-        PrepareUploadResponseDto prepared;
-        try
-        {
-            progress?.Report(new(transferId, null, TransferDirection.Send, TransferState.WaitingForAcceptance, 0, totalBytes));
-            prepared = await _client!.PrepareUploadAsync(endpoint, device.Fingerprint, dto, options?.Pin, cancellationToken).ConfigureAwait(false);
-        }
-        catch (PinRequiredException) { throw; }
-        catch (PinRateLimitedException) { throw; }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            return new(transferId, TransferDirection.Send, TransferState.Failed, [], new("prepare_failed", exception.Message));
-        }
-
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
-        _outgoingSessions[prepared.SessionId] = (endpoint.Address, linked);
+        _activeOutgoing[transferId] = linked;
+        PrepareUploadResponseDto? prepared = null;
         var results = new List<TransferredItemResult>();
-        long completedBytes = 0;
         try
         {
-            foreach (var (id, item) in itemMap)
+            var itemMap = items.Select(item => (Id: Guid.NewGuid().ToString("N"), Item: item, Length: item.Length)).ToArray();
+            var totalBytes = itemMap.Sum(static x => x.Length);
+            progress?.Report(new(transferId, null, TransferDirection.Send, TransferState.Preparing, 0, totalBytes));
+            var files = new Dictionary<string, FileDto>(StringComparer.Ordinal);
+            foreach (var item in itemMap)
+            {
+                var sha256 = options.ComputeSha256 ? await ComputeSha256Async(item.Item, linked.Token).ConfigureAwait(false) : null;
+                files[item.Id] = ToFileDto(item.Id, item.Item, item.Length, sha256);
+            }
+            var dto = new PrepareUploadRequestDto { Info = CreateLocalInfo(), Files = files };
+            progress?.Report(new(transferId, null, TransferDirection.Send, TransferState.WaitingForAcceptance, 0, totalBytes));
+            prepared = await _client!.PrepareUploadAsync(endpoint, device.Fingerprint, dto, options.Pin, linked.Token).ConfigureAwait(false);
+            _outgoingSessions[prepared.SessionId] = (endpoint.Address, linked);
+            long completedBytes = 0;
+            foreach (var (id, item, length) in itemMap)
             {
                 if (!prepared.Files.TryGetValue(id, out var token))
                     continue;
                 await using var source = await item.OpenReadAsync(linked.Token).ConfigureAwait(false);
+                if (source.CanSeek && source.Length != length)
+                    throw new IOException($"The source length changed before upload: {item.FileName}.");
                 await using var tracked = new ProgressReadStream(source, current => progress?.Report(new(
                     transferId, id, TransferDirection.Send, TransferState.Transferring, completedBytes + current, totalBytes)));
-                await _client.UploadAsync(endpoint, device.Fingerprint, prepared.SessionId, id, token, tracked, item.Length, item.ContentType, linked.Token).ConfigureAwait(false);
-                completedBytes += item.Length;
-                results.Add(new(id, item.FileName, item.Length, null));
+                await _client.UploadAsync(endpoint, device.Fingerprint, prepared.SessionId, id, token, tracked, length, item.ContentType, linked.Token).ConfigureAwait(false);
+                completedBytes += length;
+                results.Add(new(id, item.FileName, length, null));
             }
             progress?.Report(new(transferId, null, TransferDirection.Send, TransferState.Completed, completedBytes, totalBytes));
             return new(transferId, TransferDirection.Send, TransferState.Completed, results);
         }
+        catch (PinRequiredException) { throw; }
+        catch (PinRateLimitedException) { throw; }
         catch (OperationCanceledException)
         {
-            try { await _client.CancelAsync(endpoint, device.Fingerprint, prepared.SessionId, CancellationToken.None).ConfigureAwait(false); } catch { }
+            if (prepared is not null)
+                await TryCancelRemoteAsync(endpoint, device.Fingerprint, prepared.SessionId).ConfigureAwait(false);
             return new(transferId, TransferDirection.Send, TransferState.Cancelled, results);
         }
         catch (Exception exception)
         {
-            try { await _client.CancelAsync(endpoint, device.Fingerprint, prepared.SessionId, CancellationToken.None).ConfigureAwait(false); } catch { }
-            return new(transferId, TransferDirection.Send, TransferState.Failed, results, new("upload_failed", exception.Message));
+            if (prepared is not null)
+                await TryCancelRemoteAsync(endpoint, device.Fingerprint, prepared.SessionId).ConfigureAwait(false);
+            _logger.LogWarning(exception, "Outgoing transfer {TransferId} failed", transferId);
+            return new(transferId, TransferDirection.Send, TransferState.Failed, results,
+                new(ClassifyFailure(exception, prepared is null ? TransferFailureCodes.PrepareFailed : TransferFailureCodes.UploadFailed), exception.GetBaseException().Message));
         }
         finally
         {
-            _outgoingSessions.TryRemove(prepared.SessionId, out _);
+            _activeOutgoing.TryRemove(transferId, out _);
+            if (prepared is not null)
+                _outgoingSessions.TryRemove(prepared.SessionId, out _);
         }
     }
 
@@ -193,8 +277,14 @@ public sealed class LocalSendNode : IAsyncDisposable
         EnsureStarted();
         if (!_pending.TryGetValue(requestId, out var session))
             throw new LocalSendException("The incoming request no longer exists.");
+        options ??= new AcceptTransferOptions();
+        var knownIds = session.PublicRequest.Items.Select(static item => item.Id).ToHashSet(StringComparer.Ordinal);
+        if (options.AcceptedItemIds?.Any(id => !knownIds.Contains(id)) == true)
+            throw new ArgumentException("AcceptedItemIds contains an item that is not part of this request.", nameof(options));
+        if (options.TargetFileNames?.Keys.Any(id => !knownIds.Contains(id)) == true)
+            throw new ArgumentException("TargetFileNames contains an item that is not part of this request.", nameof(options));
         session.Progress = progress;
-        session.Decision.TrySetResult(new(true, options ?? new AcceptTransferOptions()));
+        session.Decision.TrySetResult(new(true, options));
         try
         {
             return await session.Completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -206,14 +296,7 @@ public sealed class LocalSendNode : IAsyncDisposable
             var endpoint = session.PublicRequest.Sender.Endpoints.FirstOrDefault();
             if (endpoint is not null)
             {
-                try
-                {
-                    await _client!.CancelAsync(endpoint, session.PublicRequest.Sender.Fingerprint, session.SessionId, CancellationToken.None).ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    _logger.LogDebug(exception, "Could not notify {Peer} that receive session {SessionId} was cancelled", endpoint, session.SessionId);
-                }
+                await TryCancelRemoteAsync(endpoint, session.PublicRequest.Sender.Fingerprint, session.SessionId).ConfigureAwait(false);
             }
             return new(session.TransferId, TransferDirection.Receive, TransferState.Cancelled, []);
         }
@@ -254,7 +337,8 @@ public sealed class LocalSendNode : IAsyncDisposable
 
     private async Task<PrepareOutcome> OnPrepareAsync(PrepareUploadRequestDto request, IPAddress remote, string? certificateFingerprint, CancellationToken requestCancellation)
     {
-        await _transferSlots.WaitAsync(requestCancellation).ConfigureAwait(false);
+        if (!await _transferSlots.WaitAsync(0, requestCancellation).ConfigureAwait(false))
+            return new(HttpStatusCode.TooManyRequests, Message: "The receiver is handling the maximum number of transfers");
         var requestId = Guid.NewGuid();
         var sessionId = Guid.NewGuid().ToString("N");
         var transferId = Guid.NewGuid();
@@ -262,7 +346,7 @@ public sealed class LocalSendNode : IAsyncDisposable
         var sender = new LocalSendDevice(request.Info.Alias, request.Info.Version, request.Info.DeviceModel,
             V2ProtocolAdapter.ParseDeviceType(request.Info.DeviceType), certificateFingerprint ?? request.Info.Fingerprint, request.Info.Download, [endpoint], DateTimeOffset.UtcNow);
         var items = request.Files.Values.Select(ToIncomingItem).ToArray();
-        var publicRequest = new IncomingTransferRequest(requestId, sessionId, sender, items, DateTimeOffset.UtcNow);
+        var publicRequest = new IncomingTransferRequest(requestId, transferId, sessionId, sender, items, DateTimeOffset.UtcNow);
         var session = new IncomingSession
         {
             RequestId = requestId,
@@ -320,11 +404,12 @@ public sealed class LocalSendNode : IAsyncDisposable
         catch (Exception exception)
         {
             _transferSlots.Release();
-            session.Fail("invalid_destination", exception.Message);
+            session.Fail(TransferFailureCodes.InvalidDestination, exception.Message);
             return new(HttpStatusCode.BadRequest, Message: exception.Message);
         }
         session.InitializeAccepted(selected);
         _incomingSessions[sessionId] = session;
+        _ = ExpireIncomingSessionAsync(session);
         _ = ReleaseIncomingSlotWhenDoneAsync(session);
         return new(HttpStatusCode.OK, new PrepareUploadResponseDto { SessionId = sessionId, Files = session.TokenSnapshot() });
     }
@@ -333,51 +418,64 @@ public sealed class LocalSendNode : IAsyncDisposable
     {
         if (!_incomingSessions.TryGetValue(sessionId, out var session) || !session.RemoteAddress.Equals(remote))
             return HttpStatusCode.NotFound;
-        if (!session.TryConsumeToken(fileId, token) || !session.Request.Files.TryGetValue(fileId, out var file))
-            return HttpStatusCode.Forbidden;
-        if (contentLength is not null && contentLength != file.Size)
-            return HttpStatusCode.BadRequest;
-
-        var destination = session.Destinations[fileId];
-        var temporary = destination + $".part-{Guid.NewGuid():N}";
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation, session.Cancellation.Token, _lifetime.Token);
-        long written = 0;
+        if (!await _uploadSlots.WaitAsync(0, requestCancellation).ConfigureAwait(false))
+            return HttpStatusCode.TooManyRequests;
         try
         {
-            await using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 512 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            if (!session.TryConsumeToken(fileId, token) || !session.Request.Files.TryGetValue(fileId, out var file))
+                return HttpStatusCode.Forbidden;
+            if (contentLength is not null && contentLength != file.Size)
             {
-                var buffer = new byte[512 * 1024];
-                while (true)
-                {
-                    var read = await body.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
-                    if (read == 0) break;
-                    written += read;
-                    if (written > file.Size)
-                        throw new LocalSendException("Uploaded content exceeded the declared size.");
-                    await output.WriteAsync(buffer.AsMemory(0, read), linked.Token).ConfigureAwait(false);
-                    session.Progress?.Report(new(session.TransferId, fileId, TransferDirection.Receive, TransferState.Transferring, written, file.Size));
-                }
-                await output.FlushAsync(linked.Token).ConfigureAwait(false);
+                session.Fail(TransferFailureCodes.LengthMismatch, $"Expected {file.Size} bytes but the request declared {contentLength}.", fileId);
+                return HttpStatusCode.BadRequest;
             }
-            if (written != file.Size)
-                throw new LocalSendException($"Uploaded content length mismatch: expected {file.Size}, received {written}.");
-            File.Move(temporary, destination);
-            RestoreTimestamps(destination, file.Metadata);
-            session.FileCompleted(fileId, file.FileName, written, destination);
-            return HttpStatusCode.OK;
+
+            var destination = session.Destinations[fileId];
+            var temporary = destination + $".part-{Guid.NewGuid():N}";
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation, session.Cancellation.Token, _lifetime.Token);
+            long written = 0;
+            using var sha256 = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            try
+            {
+                await using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 512 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+                {
+                    var buffer = new byte[512 * 1024];
+                    while (true)
+                    {
+                        var read = await body.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
+                        if (read == 0) break;
+                        written += read;
+                        if (written > file.Size)
+                            throw new LocalSendException("Uploaded content exceeded the declared size.");
+                        sha256.AppendData(buffer, 0, read);
+                        await output.WriteAsync(buffer.AsMemory(0, read), linked.Token).ConfigureAwait(false);
+                        session.ReportProgress(fileId, written);
+                    }
+                    await output.FlushAsync(linked.Token).ConfigureAwait(false);
+                }
+                if (written != file.Size)
+                    throw new LocalSendException($"Uploaded content length mismatch: expected {file.Size}, received {written}.");
+                if (file.Sha256 is not null && !MatchesSha256(sha256.GetHashAndReset(), file.Sha256))
+                    throw new LocalSendException("Uploaded content failed SHA-256 verification.");
+                File.Move(temporary, destination);
+                RestoreTimestamps(destination, file.Metadata);
+                session.FileCompleted(fileId, file.FileName, written, destination);
+                return HttpStatusCode.OK;
+            }
+            catch (OperationCanceledException)
+            {
+                TryDelete(temporary);
+                session.Cancel();
+                return HttpStatusCode.BadRequest;
+            }
+            catch (Exception exception)
+            {
+                TryDelete(temporary);
+                session.Fail(exception.Message.Contains("SHA-256", StringComparison.Ordinal) ? TransferFailureCodes.ChecksumMismatch : TransferFailureCodes.ReceiveFailed, exception.Message, fileId);
+                return HttpStatusCode.BadRequest;
+            }
         }
-        catch (OperationCanceledException)
-        {
-            if (File.Exists(temporary)) File.Delete(temporary);
-            session.Cancel();
-            return HttpStatusCode.BadRequest;
-        }
-        catch (Exception exception)
-        {
-            if (File.Exists(temporary)) File.Delete(temporary);
-            session.Fail("receive_failed", exception.Message, fileId);
-            return HttpStatusCode.BadRequest;
-        }
+        finally { _uploadSlots.Release(); }
     }
 
     private async Task<bool> OnCancelAsync(string sessionId, IPAddress remote, CancellationToken cancellationToken)
@@ -404,7 +502,21 @@ public sealed class LocalSendNode : IAsyncDisposable
         _transferSlots.Release();
     }
 
-    private static FileDto ToFileDto(string id, SendItem item)
+    private async Task ExpireIncomingSessionAsync(IncomingSession session)
+    {
+        try
+        {
+            var timeout = Task.Delay(_options.IncomingTransferTimeout, _lifetime.Token);
+            if (await Task.WhenAny(session.Completion.Task, timeout).ConfigureAwait(false) == timeout && !_lifetime.IsCancellationRequested)
+            {
+                await session.Cancellation.CancelAsync().ConfigureAwait(false);
+                session.Fail(TransferFailureCodes.TransferTimeout, "The sender did not finish the accepted transfer before its timeout.");
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+    }
+
+    private static FileDto ToFileDto(string id, SendItem item, long length, string? sha256)
     {
         FileMetadataDto? metadata = null;
         if (item is SendFileItem file)
@@ -412,7 +524,85 @@ public sealed class LocalSendNode : IAsyncDisposable
             var info = new FileInfo(file.Path);
             metadata = new() { Modified = info.LastWriteTimeUtc.ToString("O"), Accessed = info.LastAccessTimeUtc.ToString("O") };
         }
-        return new() { Id = id, FileName = item.FileName, Size = item.Length, FileType = item.ContentType, Metadata = metadata };
+        return new() { Id = id, FileName = item.FileName, Size = length, FileType = item.ContentType, Sha256 = sha256, Metadata = metadata };
+    }
+
+    private static async Task<string> ComputeSha256Async(SendItem item, CancellationToken cancellationToken)
+    {
+        await using var stream = await item.OpenReadAsync(cancellationToken).ConfigureAwait(false);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static bool MatchesSha256(byte[] actual, string expected)
+    {
+        try
+        {
+            byte[] parsed;
+            if (expected.Length == 64)
+                parsed = Convert.FromHexString(expected);
+            else
+                parsed = Convert.FromBase64String(expected);
+            return parsed.Length == actual.Length && CryptographicOperations.FixedTimeEquals(actual, parsed);
+        }
+        catch (FormatException) { return false; }
+    }
+
+    private static string ClassifyFailure(Exception exception, string fallback)
+    {
+        for (var current = exception; current is not null; current = current.InnerException!)
+        {
+            if (current is PeerIdentityException) return TransferFailureCodes.PeerIdentity;
+            if (current is PeerBusyException) return TransferFailureCodes.PeerBusy;
+            if (current is TransferDeclinedException) return TransferFailureCodes.Declined;
+            if (current is IOException) return TransferFailureCodes.SourceIo;
+        }
+        return fallback;
+    }
+
+    private async Task TryCancelRemoteAsync(DeviceEndpoint endpoint, string fingerprint, string sessionId)
+    {
+        using var timeout = new CancellationTokenSource(_options.CancelRequestTimeout);
+        try { await _client!.CancelAsync(endpoint, fingerprint, sessionId, timeout.Token).ConfigureAwait(false); }
+        catch (Exception exception) { _logger.LogDebug(exception, "Could not cancel remote session {SessionId}", sessionId); }
+    }
+
+    private async Task MaintainAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(_options.AnnouncementInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                _devices.RemoveExpired(DateTimeOffset.UtcNow - _options.DeviceExpiration);
+                await _discovery!.AnnounceAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "LocalSend maintenance loop stopped unexpectedly");
+        }
+    }
+
+    private void SetState(LocalSendNodeState state, Exception? error = null)
+    {
+        LocalSendNodeState previous;
+        lock (_stateGate)
+        {
+            previous = _state;
+            if (previous == state)
+                return;
+            _state = state;
+        }
+        _stateChanges.Publish(new(previous, state, error));
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     private static IncomingItem ToIncomingItem(FileDto file) => new(file.Id, file.FileName, file.Size, file.FileType, file.Sha256, file.Preview,
@@ -431,7 +621,7 @@ public sealed class LocalSendNode : IAsyncDisposable
     private void EnsureStarted()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_started) throw new InvalidOperationException("The LocalSend node has not been started.");
+        if (!_started || State != LocalSendNodeState.Running) throw new InvalidOperationException("The LocalSend node is not running.");
     }
 
     public async ValueTask DisposeAsync()
@@ -439,9 +629,12 @@ public sealed class LocalSendNode : IAsyncDisposable
         if (_disposed) return;
         await StopAsync().ConfigureAwait(false);
         _disposed = true;
+        SetState(LocalSendNodeState.Disposed);
+        _stateChanges.Complete();
         _identity?.Dispose();
         _lifetime.Dispose();
         _transferSlots.Dispose();
+        _uploadSlots.Dispose();
         _lifecycle.Dispose();
     }
 }

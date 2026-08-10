@@ -40,4 +40,23 @@ public sealed class SafeFileTargetTests
         }
         finally { Directory.Delete(root, recursive: true); }
     }
+
+    [Fact]
+    public void RejectsLinkedDirectoryThatEscapesRoot()
+    {
+        var root = TestDirectory.Create();
+        var outside = TestDirectory.Create();
+        try
+        {
+            var link = Path.Combine(root, "link");
+            try { Directory.CreateSymbolicLink(link, outside); }
+            catch (Exception exception) when (exception is UnauthorizedAccessException or IOException) { return; }
+            Assert.Throws<LocalSendException>(() => SafeFileTarget.ResolveUnique(root, "link/escaped.txt"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+            Directory.Delete(outside, recursive: true);
+        }
+    }
 }

@@ -29,6 +29,7 @@ internal static class Cli
                 "discover" => await DiscoverAsync(node, parsed, stop.Token).ConfigureAwait(false),
                 "listen" => await ListenAsync(node, parsed, stop.Token).ConfigureAwait(false),
                 "send" => await SendFilesAsync(node, parsed, stop.Token).ConfigureAwait(false),
+                "send-dir" => await SendDirectoryAsync(node, parsed, stop.Token).ConfigureAwait(false),
                 "send-text" => await SendTextAsync(node, parsed, stop.Token).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
@@ -87,10 +88,14 @@ internal static class Cli
 
     private static async Task ReceiveAndReportAsync(LocalSendNode node, IncomingTransferRequest request, CancellationToken cancellationToken)
     {
-        var progress = new Progress<TransferProgress>(PrintProgress);
-        var result = await node.AcceptAsync(request.RequestId, progress: progress, cancellationToken: cancellationToken).ConfigureAwait(false);
-        Console.WriteLine($"Receive {result.State}: {result.Items.Count} item(s)");
-        foreach (var item in result.Items) Console.WriteLine($"  {item.SavedPath}");
+        try
+        {
+            var progress = new Progress<TransferProgress>(PrintProgress);
+            var result = await node.AcceptAsync(request.RequestId, progress: progress, cancellationToken: cancellationToken).ConfigureAwait(false);
+            Console.WriteLine($"Receive {result.State}: {result.Items.Count} item(s)");
+            foreach (var item in result.Items) Console.WriteLine($"  {item.SavedPath}");
+        }
+        catch (Exception exception) { Console.Error.WriteLine($"receive error: {exception.Message}"); }
     }
 
     private static async Task<int> SendFilesAsync(LocalSendNode node, Arguments args, CancellationToken cancellationToken)
@@ -98,17 +103,26 @@ internal static class Cli
         var target = args.Value("target") ?? throw new ArgumentException("send requires --target <alias|fingerprint>.");
         if (args.Positionals.Count == 0) throw new ArgumentException("send requires at least one file path.");
         var items = args.Positionals.Select(path => (SendItem)new SendFileItem(path)).ToArray();
-        return await SendAsync(node, target, items, args.Value("pin"), cancellationToken).ConfigureAwait(false);
+        return await SendAsync(node, target, items, args.Value("pin"), args.Has("sha256"), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<int> SendDirectoryAsync(LocalSendNode node, Arguments args, CancellationToken cancellationToken)
+    {
+        var target = args.Value("target") ?? throw new ArgumentException("send-dir requires --target <alias|fingerprint>.");
+        if (args.Positionals.Count != 1) throw new ArgumentException("send-dir requires exactly one directory path.");
+        var items = LocalSendItems.FromDirectory(args.Positionals[0]).Cast<SendItem>().ToArray();
+        if (items.Length == 0) throw new ArgumentException("The directory contains no files.");
+        return await SendAsync(node, target, items, args.Value("pin"), args.Has("sha256"), cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> SendTextAsync(LocalSendNode node, Arguments args, CancellationToken cancellationToken)
     {
         var target = args.Value("target") ?? throw new ArgumentException("send-text requires --target <alias|fingerprint>.");
         if (args.Positionals.Count == 0) throw new ArgumentException("send-text requires text.");
-        return await SendAsync(node, target, [new SendTextItem(string.Join(' ', args.Positionals))], args.Value("pin"), cancellationToken).ConfigureAwait(false);
+        return await SendAsync(node, target, [new SendTextItem(string.Join(' ', args.Positionals))], args.Value("pin"), args.Has("sha256"), cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task<int> SendAsync(LocalSendNode node, string target, IReadOnlyCollection<SendItem> items, string? pin, CancellationToken cancellationToken)
+    private static async Task<int> SendAsync(LocalSendNode node, string target, IReadOnlyCollection<SendItem> items, string? pin, bool computeSha256, CancellationToken cancellationToken)
     {
         await node.StartAsync(cancellationToken).ConfigureAwait(false);
         await Task.Delay(TimeSpan.FromSeconds(4), cancellationToken).ConfigureAwait(false);
@@ -116,7 +130,7 @@ internal static class Cli
             d.Alias.Equals(target, StringComparison.OrdinalIgnoreCase) || d.Fingerprint.Equals(target, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"Device '{target}' was not discovered.");
         PrintDevice(device);
-        var result = await node.SendAsync(device, items, new SendOptions { Pin = pin }, new Progress<TransferProgress>(PrintProgress), cancellationToken).ConfigureAwait(false);
+        var result = await node.SendAsync(device, items, new SendOptions { Pin = pin, ComputeSha256 = computeSha256 }, new Progress<TransferProgress>(PrintProgress), cancellationToken).ConfigureAwait(false);
         Console.WriteLine($"Transfer {result.State}: {result.Items.Count} item(s)");
         if (result.Failure is not null) Console.Error.WriteLine(result.Failure.Message);
         return result.State == TransferState.Completed ? 0 : 1;
@@ -133,9 +147,10 @@ internal static class Cli
           discover [--seconds 5]
           listen [--auto-accept] [--receive-pin PIN]
           send --target ALIAS_OR_FINGERPRINT [--pin PIN] FILE...
+          send-dir --target ALIAS_OR_FINGERPRINT [--pin PIN] DIRECTORY
           send-text --target ALIAS_OR_FINGERPRINT [--pin PIN] TEXT...
 
-        Common options: --alias NAME --port PORT --data-dir PATH --download-dir PATH --verbose
+        Common options: --alias NAME --port PORT --data-dir PATH --download-dir PATH --sha256 --verbose
         """);
 }
 
@@ -154,7 +169,7 @@ internal sealed class Arguments
         {
             if (!args[index].StartsWith("--", StringComparison.Ordinal)) { result.Positionals.Add(args[index]); continue; }
             var name = args[index][2..];
-            if (name is "auto-accept" or "verbose") { result._options[name] = null; continue; }
+            if (name is "auto-accept" or "sha256" or "verbose") { result._options[name] = null; continue; }
             string? value = null;
             if (index + 1 < args.Length && !args[index + 1].StartsWith("--", StringComparison.Ordinal)) value = args[++index];
             result._options[name] = value;

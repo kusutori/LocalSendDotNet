@@ -4,11 +4,11 @@ using System.Threading.Channels;
 
 namespace LocalSendDotNet;
 
-internal sealed class BroadcastHub<T>(int capacity)
+internal sealed class BroadcastHub<T>(int capacity, bool dropOldest = true)
 {
     private readonly ConcurrentDictionary<long, Channel<T>> _subscribers = new();
     private long _nextId;
-    private bool _completed;
+    private int _completed;
 
     public void Publish(T item)
     {
@@ -24,7 +24,7 @@ internal sealed class BroadcastHub<T>(int capacity)
 
     public async IAsyncEnumerable<T> Subscribe([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        if (_completed)
+        if (Volatile.Read(ref _completed) != 0)
             yield break;
 
         var id = Interlocked.Increment(ref _nextId);
@@ -32,9 +32,11 @@ internal sealed class BroadcastHub<T>(int capacity)
         {
             SingleReader = true,
             SingleWriter = false,
-            FullMode = BoundedChannelFullMode.DropOldest
+            FullMode = dropOldest ? BoundedChannelFullMode.DropOldest : BoundedChannelFullMode.Wait
         });
         _subscribers[id] = channel;
+        if (Volatile.Read(ref _completed) != 0 && _subscribers.TryRemove(id, out _))
+            channel.Writer.TryComplete();
         try
         {
             await foreach (var item in channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
@@ -48,7 +50,8 @@ internal sealed class BroadcastHub<T>(int capacity)
 
     public void Complete()
     {
-        _completed = true;
+        if (Interlocked.Exchange(ref _completed, 1) != 0)
+            return;
         foreach (var channel in _subscribers.Values)
             channel.Writer.TryComplete();
         _subscribers.Clear();

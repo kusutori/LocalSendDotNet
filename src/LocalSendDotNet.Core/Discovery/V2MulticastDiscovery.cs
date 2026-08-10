@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Collections.Concurrent;
 using LocalSendDotNet.Protocol.V2;
 using Microsoft.Extensions.Logging;
 
@@ -14,6 +15,8 @@ internal sealed class V2MulticastDiscovery(
     ILogger logger) : IAsyncDisposable
 {
     private readonly CancellationTokenSource _stop = new();
+    private readonly SemaphoreSlim _announceGate = new(1, 1);
+    private readonly ConcurrentDictionary<IPAddress, byte> _registrations = new();
     private Socket? _receiver;
     private Task? _receiveLoop;
 
@@ -49,13 +52,19 @@ internal sealed class V2MulticastDiscovery(
 
     public async Task AnnounceAsync(CancellationToken cancellationToken)
     {
-        var payload = JsonSerializer.SerializeToUtf8Bytes(createAnnouncement(), V2Json.Options);
-        var delays = new[] { TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2) };
-        foreach (var delay in delays)
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token);
+        await _announceGate.WaitAsync(linked.Token).ConfigureAwait(false);
+        try
         {
-            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-            await SendOnAllInterfacesAsync(payload, cancellationToken).ConfigureAwait(false);
+            var payload = JsonSerializer.SerializeToUtf8Bytes(createAnnouncement(), V2Json.Options);
+            var delays = new[] { TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2) };
+            foreach (var delay in delays)
+            {
+                await Task.Delay(delay, linked.Token).ConfigureAwait(false);
+                await SendOnAllInterfacesAsync(payload, linked.Token).ConfigureAwait(false);
+            }
         }
+        finally { _announceGate.Release(); }
     }
 
     private async Task ReceiveLoopAsync(Socket receiver, CancellationToken cancellationToken)
@@ -70,9 +79,14 @@ internal sealed class V2MulticastDiscovery(
                 var message = JsonSerializer.Deserialize<DeviceInfoDto>(buffer.AsSpan(0, result.ReceivedBytes), V2Json.Options);
                 if (message is null || result.RemoteEndPoint is not IPEndPoint endpoint)
                     continue;
-                _ = ObserveAnnouncementAsync(message, endpoint.Address, cancellationToken);
+                if (_registrations.TryAdd(endpoint.Address, 0))
+                    _ = ObserveAnnouncementAsync(message, endpoint.Address, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
+            catch (JsonException exception)
+            {
+                logger.LogDebug(exception, "Ignoring malformed LocalSend multicast announcement");
+            }
             catch (Exception exception)
             {
                 logger.LogWarning(exception, "LocalSend multicast receive failed");
@@ -85,6 +99,7 @@ internal sealed class V2MulticastDiscovery(
         try { await onAnnouncement(message, source, cancellationToken).ConfigureAwait(false); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception) { logger.LogDebug(exception, "Could not register with announced LocalSend peer {Address}", source); }
+        finally { _registrations.TryRemove(source, out _); }
     }
 
     private async Task SendOnAllInterfacesAsync(byte[] payload, CancellationToken cancellationToken)
@@ -122,6 +137,9 @@ internal sealed class V2MulticastDiscovery(
             try { await _receiveLoop.ConfigureAwait(false); }
             catch (ObjectDisposedException) { }
         }
+        await _announceGate.WaitAsync().ConfigureAwait(false);
+        _announceGate.Release();
         _stop.Dispose();
+        _announceGate.Dispose();
     }
 }

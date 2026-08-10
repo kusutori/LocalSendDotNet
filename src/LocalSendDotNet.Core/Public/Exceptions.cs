@@ -20,4 +20,15 @@ public sealed class PinRateLimitedException : LocalSendException
 public sealed class PeerIdentityException : LocalSendException
 {
     public PeerIdentityException(string message) : base(message) { }
+    public PeerIdentityException(string message, Exception innerException) : base(message, innerException) { }
+}
+
+public sealed class PeerBusyException : LocalSendException
+{
+    public PeerBusyException() : base("The remote device is handling the maximum number of transfers.") { }
+}
+
+public sealed class TransferDeclinedException : LocalSendException
+{
+    public TransferDeclinedException() : base("The remote device declined the transfer.") { }
 }

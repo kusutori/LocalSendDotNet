@@ -11,6 +11,8 @@ internal sealed class IncomingSession
     private readonly List<TransferredItemResult> _results = [];
     private readonly object _gate = new();
     private readonly object _tokenGate = new();
+    private readonly Dictionary<string, long> _itemProgress = new(StringComparer.Ordinal);
+    private long _totalBytes;
 
     public required Guid RequestId { get; init; }
     public required Guid TransferId { get; init; }
@@ -25,7 +27,12 @@ internal sealed class IncomingSession
     public CancellationTokenSource Cancellation { get; } = new();
     public IProgress<TransferProgress>? Progress { get; set; }
 
-    public void InitializeAccepted(IEnumerable<string> ids) => _remaining = ids.Count();
+    public void InitializeAccepted(IEnumerable<string> ids)
+    {
+        var accepted = ids.ToArray();
+        _remaining = accepted.Length;
+        _totalBytes = accepted.Sum(id => Request.Files[id].Size);
+    }
 
     public bool TryConsumeToken(string itemId, string token)
     {
@@ -53,10 +60,19 @@ internal sealed class IncomingSession
         }
     }
 
+    public void ReportProgress(string itemId, long bytes)
+    {
+        lock (_gate)
+        {
+            _itemProgress[itemId] = bytes;
+            Progress?.Report(new(TransferId, itemId, TransferDirection.Receive, TransferState.Transferring, _itemProgress.Values.Sum(), _totalBytes));
+        }
+    }
+
     public void Fail(string code, string message, string? itemId = null)
     {
-        Cancellation.Cancel();
         Completion.TrySetResult(new(TransferId, TransferDirection.Receive, TransferState.Failed, _results.ToArray(), new(code, message, itemId)));
+        Cancellation.Cancel();
     }
 
     public void Cancel() => Completion.TrySetResult(new(TransferId, TransferDirection.Receive, TransferState.Cancelled, _results.ToArray()));

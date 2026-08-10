@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using LocalSendDotNet.Protocol.V2;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
@@ -25,7 +26,7 @@ internal sealed class V2Server(
     Func<string, IPAddress, CancellationToken, Task<bool>> onCancel,
     ILogger logger) : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<IPAddress, int> _pinAttempts = new();
+    private readonly ConcurrentDictionary<IPAddress, (int Count, DateTimeOffset LockedUntil)> _pinAttempts = new();
     private WebApplication? _application;
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -36,19 +37,23 @@ internal sealed class V2Server(
             EnvironmentName = Environments.Production
         });
         builder.Logging.ClearProviders();
-        builder.WebHost.ConfigureKestrel(server => server.ListenAnyIP(options.Port, listen =>
+        builder.WebHost.ConfigureKestrel(server =>
         {
-            listen.Protocols = HttpProtocols.Http1;
-            if (options.EnableHttps)
+            server.Limits.MaxRequestBodySize = null;
+            server.ListenAnyIP(options.Port, listen =>
             {
-                listen.UseHttps(https =>
+                listen.Protocols = HttpProtocols.Http1;
+                if (options.EnableHttps)
                 {
-                    https.ServerCertificate = identity.Certificate;
-                    https.ClientCertificateMode = ClientCertificateMode.AllowCertificate;
-                    https.ClientCertificateValidation = static (_, _, _) => true;
-                });
-            }
-        }));
+                    listen.UseHttps(https =>
+                    {
+                        https.ServerCertificate = identity.Certificate;
+                        https.ClientCertificateMode = ClientCertificateMode.AllowCertificate;
+                        https.ClientCertificateValidation = static (_, _, _) => true;
+                    });
+                }
+            });
+        });
 
         var app = builder.Build();
         app.MapPost(V2Constants.BasePath + "/register", RegisterAsync);
@@ -62,6 +67,8 @@ internal sealed class V2Server(
 
     private async Task RegisterAsync(HttpContext context)
     {
+        if (!ConfigureRequestLimit(context, 64 * 1024))
+            return;
         var payload = await ReadJsonAsync<DeviceInfoDto>(context).ConfigureAwait(false);
         if (payload is null)
             return;
@@ -70,6 +77,8 @@ internal sealed class V2Server(
         if (options.EnableHttps && (certificate is null || !DeviceIdentityStore.ValidatePeerCertificate(certificate, payload.Fingerprint)))
         {
             logger.LogWarning("Ignoring spoofed register fingerprint from {Address}", context.Connection.RemoteIpAddress);
+            await WriteErrorAsync(context, HttpStatusCode.Forbidden, "Client fingerprint mismatch").ConfigureAwait(false);
+            return;
         }
         else
         {
@@ -105,9 +114,8 @@ internal sealed class V2Server(
     private async Task PrepareUploadAsync(HttpContext context)
     {
         var remote = RemoteAddress(context);
-        if (!CheckPin(context, remote))
+        if (!ConfigureRequestLimit(context, options.MaxPrepareRequestBytes))
             return;
-
         var payload = await ReadJsonAsync<PrepareUploadRequestDto>(context).ConfigureAwait(false);
         if (payload is null)
             return;
@@ -116,9 +124,22 @@ internal sealed class V2Server(
             await WriteErrorAsync(context, HttpStatusCode.BadRequest, "No files provided").ConfigureAwait(false);
             return;
         }
-        if (payload.Files.Any(static pair => pair.Value.Size < 0 || string.IsNullOrWhiteSpace(pair.Value.FileName) || !StringComparer.Ordinal.Equals(pair.Key, pair.Value.Id)))
+        if (payload.Info.Port is < 1 or > ushort.MaxValue || string.IsNullOrWhiteSpace(payload.Info.Alias) ||
+            !IsFingerprint(payload.Info.Fingerprint) ||
+            (!StringComparer.OrdinalIgnoreCase.Equals(payload.Info.Protocol, "http") && !StringComparer.OrdinalIgnoreCase.Equals(payload.Info.Protocol, "https")))
+        {
+            await WriteErrorAsync(context, HttpStatusCode.BadRequest, "Invalid sender metadata").ConfigureAwait(false);
+            return;
+        }
+        if (payload.Files.Any(static pair => pair.Value.Size < 0 || string.IsNullOrWhiteSpace(pair.Value.FileName) ||
+            string.IsNullOrWhiteSpace(pair.Value.FileType) || !StringComparer.Ordinal.Equals(pair.Key, pair.Value.Id)))
         {
             await WriteErrorAsync(context, HttpStatusCode.BadRequest, "Invalid file metadata").ConfigureAwait(false);
+            return;
+        }
+        if (payload.Files.Count > options.MaxIncomingItemsPerTransfer || ExceedsTransferLimit(payload.Files.Values, options.MaxIncomingTransferBytes))
+        {
+            await WriteErrorAsync(context, HttpStatusCode.RequestEntityTooLarge, "Incoming transfer exceeds configured limits").ConfigureAwait(false);
             return;
         }
 
@@ -129,6 +150,8 @@ internal sealed class V2Server(
             await WriteErrorAsync(context, HttpStatusCode.Forbidden, "Client fingerprint mismatch").ConfigureAwait(false);
             return;
         }
+        if (!CheckPin(context, remote))
+            return;
 
         var outcome = await onPrepare(payload, remote, certFingerprint, context.RequestAborted).ConfigureAwait(false);
         context.Response.StatusCode = (int)outcome.StatusCode;
@@ -166,12 +189,15 @@ internal sealed class V2Server(
     {
         if (options.ReceivePin is null)
             return true;
-        var attempts = _pinAttempts.GetOrAdd(remote, 0);
-        if (attempts >= 3)
+        var now = DateTimeOffset.UtcNow;
+        var attempts = _pinAttempts.GetOrAdd(remote, static _ => (0, DateTimeOffset.MinValue));
+        if (attempts.Count >= 3 && attempts.LockedUntil > now)
         {
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             return false;
         }
+        if (attempts.Count >= 3)
+            attempts = (0, DateTimeOffset.MinValue);
         var supplied = context.Request.Query["pin"].ToString();
         if (StringComparer.Ordinal.Equals(supplied, options.ReceivePin))
         {
@@ -179,16 +205,38 @@ internal sealed class V2Server(
             return true;
         }
         if (supplied.Length > 0)
-            _pinAttempts[remote] = attempts + 1;
+        {
+            var count = attempts.Count + 1;
+            _pinAttempts[remote] = (count, count >= 3 ? now + options.PinLockoutDuration : DateTimeOffset.MinValue);
+        }
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         return false;
     }
+
+    private static bool ExceedsTransferLimit(IEnumerable<FileDto> files, long limit)
+    {
+        long total = 0;
+        foreach (var file in files)
+        {
+            if (file.Size > limit - total)
+                return true;
+            total += file.Size;
+        }
+        return false;
+    }
+
+    private static bool IsFingerprint(string value) => value.Length == 64 && value.All(Uri.IsHexDigit);
 
     private static async Task<T?> ReadJsonAsync<T>(HttpContext context)
     {
         try
         {
             return await context.Request.ReadFromJsonAsync<T>(V2Json.Options, context.RequestAborted).ConfigureAwait(false);
+        }
+        catch (Microsoft.AspNetCore.Http.BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
+        {
+            await WriteErrorAsync(context, HttpStatusCode.RequestEntityTooLarge, "JSON request exceeds the configured limit").ConfigureAwait(false);
+            return default;
         }
         catch (Exception exception) when (exception is System.Text.Json.JsonException or Microsoft.AspNetCore.Http.BadHttpRequestException)
         {
@@ -197,13 +245,30 @@ internal sealed class V2Server(
         }
     }
 
+    private static bool ConfigureRequestLimit(HttpContext context, long limit)
+    {
+        if (context.Request.ContentLength > limit)
+        {
+            context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+            return false;
+        }
+        var feature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+        if (feature is { IsReadOnly: false })
+            feature.MaxRequestBodySize = limit;
+        return true;
+    }
+
     private static Task WriteErrorAsync(HttpContext context, HttpStatusCode status, string message)
     {
         context.Response.StatusCode = (int)status;
         return context.Response.WriteAsJsonAsync(new ErrorResponseDto { Message = message }, V2Json.Options, context.RequestAborted);
     }
 
-    private static IPAddress RemoteAddress(HttpContext context) => context.Connection.RemoteIpAddress ?? IPAddress.None;
+    private static IPAddress RemoteAddress(HttpContext context)
+    {
+        var address = context.Connection.RemoteIpAddress ?? IPAddress.None;
+        return address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
+    }
 
     public async ValueTask DisposeAsync()
     {

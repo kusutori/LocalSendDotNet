@@ -1,9 +1,11 @@
+using CommunityToolkit.WinUI.Controls;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using static Microsoft.UI.Reactor.Factories;
+using static LocalSendDotNet.App.Controls.Toolkit.SegmentedElement;
 
 sealed record ReceivePageProps(
     AppRuntimeState Runtime,
@@ -14,6 +16,12 @@ sealed class ReceivePage : Component<ReceivePageProps>
 {
     public override Element Render()
     {
+        var autoSaveItems = UseMemo(() => new object[]
+        {
+            new SegmentedItem { Content = "关闭" },
+            new SegmentedItem { Content = "收藏设备" },
+            new SegmentedItem { Content = "开启" },
+        }, []);
         var identity = Props.Runtime.Identity;
         var alias = identity?.Alias ?? Props.Settings.Alias;
         var fingerprint = identity?.Fingerprint;
@@ -57,17 +65,14 @@ sealed class ReceivePage : Component<ReceivePageProps>
                     AlignItems = FlexAlign.Center,
                     ColumnGap = 12,
                 },
-                SelectorBar(
-                    [
-                        SelectorBarItem("关闭", "Cancel"),
-                        SelectorBarItem("收藏设备", "Favorite"),
-                        SelectorBarItem("开启", "Accept"),
-                    ],
-                    (int)Props.Settings.AutoSave,
-                    index => Props.UpdateSettings(settings => settings with
+                Segmented(
+                    selectedIndex: (int)Props.Settings.AutoSave,
+                    onSelectedIndexChanged: index => Props.UpdateSettings(settings => settings with
                     {
                         AutoSave = (AutoSaveMode)index,
-                    }))) with
+                    }),
+                    items: autoSaveItems)
+                    .HAlign(HorizontalAlignment.Stretch)) with
             { RowGap = 20 })
             .MaxWidth(560)
             .HAlign(HorizontalAlignment.Stretch);

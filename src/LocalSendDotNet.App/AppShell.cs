@@ -41,6 +41,7 @@ sealed class AppShell : Component
                 updateSettings)),
             AppRoute.Send => Component<SendPage, SendPageProps>(new(
                 runtime,
+                nodeRef.Current,
                 RefreshAsync)),
             AppRoute.Settings => Component<SettingsPage, SettingsPageProps>(new(
                 settings,
@@ -87,7 +88,7 @@ sealed class AppShell : Component
                 2 => ElementTheme.Dark,
                 _ => ElementTheme.Default,
             })
-            .Backdrop(BackdropKind.MicaAlt);
+            .Backdrop(BackdropKind.Mica);
 
         return root;
 

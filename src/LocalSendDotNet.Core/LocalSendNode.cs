@@ -38,6 +38,9 @@ public sealed class LocalSendNode : IAsyncDisposable
     private bool _stopped;
     private bool _disposed;
 
+    /// <summary>Creates a LocalSend node. Call <see cref="StartAsync"/> before using network operations.</summary>
+    /// <param name="options">Node identity, storage, transport, timeout, and limit settings.</param>
+    /// <param name="loggerFactory">An optional structured logger factory.</param>
     public LocalSendNode(LocalSendOptions options, ILoggerFactory? loggerFactory = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -48,12 +51,16 @@ public sealed class LocalSendNode : IAsyncDisposable
         _uploadSlots = new SemaphoreSlim(options.MaxConcurrentFileUploads, options.MaxConcurrentFileUploads);
     }
 
+    /// <summary>Gets the current lifecycle state.</summary>
     public LocalSendNodeState State { get { lock (_stateGate) return _state; } }
 
+    /// <summary>Gets the persistent local identity after startup, or <see langword="null"/> before identity loading.</summary>
     public LocalSendIdentity? Identity => _identity is null ? null : new(
         _options.Alias, V2Constants.Version, _options.DeviceModel, _options.DeviceType, _identity.Fingerprint,
         _options.Port, _options.EnableHttps ? LocalSendProtocol.Https : LocalSendProtocol.Http);
 
+    /// <summary>Loads identity, starts the server and discovery receiver, and sends an initial announcement burst.</summary>
+    /// <param name="cancellationToken">Cancels startup. A cancelled startup may be retried.</param>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -65,13 +72,13 @@ public sealed class LocalSendNode : IAsyncDisposable
             if (_stopped)
                 throw new InvalidOperationException("A stopped LocalSendNode cannot be restarted; create a new node instance.");
             SetState(LocalSendNodeState.Starting);
-            Directory.CreateDirectory(_options.DownloadDirectory);
-            _identity = await DeviceIdentityStore.LoadOrCreateAsync(_options.DataDirectory, cancellationToken).ConfigureAwait(false);
-            _client = new V2HttpClient(_identity, _options);
-            _server = new V2Server(_options, _identity, () => CreateLocalInfo(), OnRegisterAsync, OnPrepareAsync, OnUploadAsync, OnCancelAsync, _logger);
-            await _server.StartAsync(cancellationToken).ConfigureAwait(false);
             try
             {
+                Directory.CreateDirectory(_options.DownloadDirectory);
+                _identity = await DeviceIdentityStore.LoadOrCreateAsync(_options.DataDirectory, cancellationToken).ConfigureAwait(false);
+                _client = new V2HttpClient(_identity, _options);
+                _server = new V2Server(_options, _identity, () => CreateLocalInfo(), OnRegisterAsync, OnPrepareAsync, OnUploadAsync, OnCancelAsync, _logger);
+                await _server.StartAsync(cancellationToken).ConfigureAwait(false);
                 _discovery = new V2MulticastDiscovery(_options, () => CreateLocalInfo(announce: true), OnAnnouncementAsync, _logger);
                 await _discovery.StartAsync(cancellationToken).ConfigureAwait(false);
                 await _discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false);
@@ -82,18 +89,32 @@ public sealed class LocalSendNode : IAsyncDisposable
             catch (Exception exception)
             {
                 if (_discovery is not null)
-                    await _discovery.DisposeAsync().ConfigureAwait(false);
-                await _server.DisposeAsync().ConfigureAwait(false);
+                {
+                    try { await _discovery.DisposeAsync().ConfigureAwait(false); }
+                    catch (Exception cleanupException) { _logger.LogDebug(cleanupException, "Could not clean up discovery after startup failure"); }
+                }
+                if (_server is not null)
+                {
+                    try { await _server.DisposeAsync().ConfigureAwait(false); }
+                    catch (Exception cleanupException) { _logger.LogDebug(cleanupException, "Could not clean up server after startup failure"); }
+                }
                 _discovery = null;
                 _server = null;
+                _client = null;
+                _identity?.Dispose();
+                _identity = null;
                 _started = false;
-                SetState(LocalSendNodeState.Faulted, exception);
+                SetState(exception is OperationCanceledException ? LocalSendNodeState.Created : LocalSendNodeState.Faulted,
+                    exception is OperationCanceledException ? null : exception);
                 throw;
             }
         }
         finally { _lifecycle.Release(); }
     }
 
+    /// <summary>Stops discovery, rejects pending offers, cancels transfers, and releases listening ports.</summary>
+    /// <param name="cancellationToken">Cancels the stop wait.</param>
+    /// <remarks>A successfully stopped instance cannot be restarted.</remarks>
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         await _lifecycle.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -132,20 +153,35 @@ public sealed class LocalSendNode : IAsyncDisposable
         finally { _lifecycle.Release(); }
     }
 
-    public Task RefreshAsync(CancellationToken cancellationToken = default)
+    /// <summary>Forces discovery socket recovery for current interfaces and sends an announcement burst.</summary>
+    /// <param name="cancellationToken">Cancels refresh.</param>
+    public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         EnsureStarted();
-        return _discovery!.AnnounceAsync(cancellationToken);
+        await _discovery!.RefreshInterfacesAsync(force: true, cancellationToken).ConfigureAwait(false);
+        await _discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Gets an ordered snapshot of currently known devices.</summary>
     public IReadOnlyList<LocalSendDevice> GetDevices() => _devices.Snapshot();
 
+    /// <summary>Watches node lifecycle transitions occurring after subscription.</summary>
+    /// <param name="cancellationToken">Stops enumeration.</param>
     public IAsyncEnumerable<LocalSendNodeStateChange> WatchStateChangesAsync(CancellationToken cancellationToken = default) => _stateChanges.Subscribe(cancellationToken);
 
+    /// <summary>Watches device additions, updates, and removals occurring after subscription.</summary>
+    /// <param name="cancellationToken">Stops enumeration.</param>
     public IAsyncEnumerable<DeviceChange> WatchDeviceChangesAsync(CancellationToken cancellationToken = default) => _deviceChanges.Subscribe(cancellationToken);
 
+    /// <summary>Watches incoming offers that require an accept or decline decision.</summary>
+    /// <param name="cancellationToken">Stops enumeration.</param>
     public IAsyncEnumerable<IncomingTransferRequest> WatchIncomingTransfersAsync(CancellationToken cancellationToken = default) => _incomingTransfers.Subscribe(cancellationToken);
 
+    /// <summary>Registers with and retains a manually trusted peer until explicit removal or disposal.</summary>
+    /// <param name="endpoint">The peer endpoint.</param>
+    /// <param name="fingerprint">The trusted peer certificate fingerprint.</param>
+    /// <param name="cancellationToken">Cancels registration.</param>
+    /// <returns>The registered peer snapshot.</returns>
     public async Task<LocalSendDevice> AddKnownDeviceAsync(DeviceEndpoint endpoint, string fingerprint, CancellationToken cancellationToken = default)
     {
         EnsureStarted();
@@ -162,6 +198,10 @@ public sealed class LocalSendNode : IAsyncDisposable
         return _devices.Upsert(device, persistent: true);
     }
 
+    /// <summary>Inspects a manually entered endpoint without adding it to the device list.</summary>
+    /// <param name="endpoint">The endpoint to inspect.</param>
+    /// <param name="cancellationToken">Cancels probing.</param>
+    /// <returns>Peer metadata and whether HTTPS verified its identity binding.</returns>
     public async Task<DeviceProbeResult> ProbeDeviceAsync(DeviceEndpoint endpoint, CancellationToken cancellationToken = default)
     {
         EnsureStarted();
@@ -172,12 +212,19 @@ public sealed class LocalSendNode : IAsyncDisposable
         return new(device, result.Verified);
     }
 
+    /// <summary>Removes a known or manually trusted device.</summary>
+    /// <param name="fingerprint">The device fingerprint.</param>
+    /// <returns><see langword="true"/> when a device was removed.</returns>
     public bool RemoveDevice(string fingerprint)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
         return _devices.Remove(fingerprint);
     }
 
+    /// <summary>Cancels an active outgoing, pending incoming, or accepted incoming transfer.</summary>
+    /// <param name="transferId">The transfer identifier reported by progress or an incoming request.</param>
+    /// <param name="cancellationToken">Cancels the cancellation request.</param>
+    /// <returns><see langword="true"/> when the transfer was active.</returns>
     public async Task<bool> CancelTransferAsync(Guid transferId, CancellationToken cancellationToken = default)
     {
         EnsureStarted();
@@ -196,6 +243,15 @@ public sealed class LocalSendNode : IAsyncDisposable
         return true;
     }
 
+    /// <summary>Offers items to one peer and streams the receiver-selected content.</summary>
+    /// <param name="device">The target peer.</param>
+    /// <param name="items">Items to offer.</param>
+    /// <param name="options">Optional PIN and checksum behavior.</param>
+    /// <param name="progress">Optional aggregate progress callback.</param>
+    /// <param name="cancellationToken">Cancels negotiation or upload.</param>
+    /// <returns>The final transfer outcome.</returns>
+    /// <exception cref="PinRequiredException">The peer requires a PIN or rejected the supplied PIN.</exception>
+    /// <exception cref="PinRateLimitedException">The peer temporarily rate-limited PIN attempts.</exception>
     public async Task<TransferResult> SendAsync(
         LocalSendDevice device,
         IReadOnlyCollection<SendItem> items,
@@ -272,6 +328,12 @@ public sealed class LocalSendNode : IAsyncDisposable
         }
     }
 
+    /// <summary>Accepts all or selected items from a pending incoming offer and waits for completion.</summary>
+    /// <param name="requestId">The incoming request identifier.</param>
+    /// <param name="options">Selection, destination, and rename options.</param>
+    /// <param name="progress">Optional aggregate receive progress callback.</param>
+    /// <param name="cancellationToken">Cancels receiving and notifies the sender.</param>
+    /// <returns>The final receive outcome.</returns>
     public async Task<TransferResult> AcceptAsync(Guid requestId, AcceptTransferOptions? options = null, IProgress<TransferProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         EnsureStarted();
@@ -302,6 +364,9 @@ public sealed class LocalSendNode : IAsyncDisposable
         }
     }
 
+    /// <summary>Declines a pending incoming offer.</summary>
+    /// <param name="requestId">The incoming request identifier.</param>
+    /// <param name="cancellationToken">Cancels the local operation before the decision is applied.</param>
     public Task DeclineAsync(Guid requestId, CancellationToken cancellationToken = default)
     {
         EnsureStarted();
@@ -574,15 +639,17 @@ public sealed class LocalSendNode : IAsyncDisposable
         {
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
-                _devices.RemoveExpired(DateTimeOffset.UtcNow - _options.DeviceExpiration);
-                await _discovery!.AnnounceAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await _discovery!.RefreshInterfacesAsync(force: false, cancellationToken).ConfigureAwait(false);
+                    _devices.RemoveExpired(DateTimeOffset.UtcNow - _options.DeviceExpiration);
+                    await _discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+                catch (Exception exception) { _logger.LogWarning(exception, "LocalSend maintenance iteration failed"); }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(exception, "LocalSend maintenance loop stopped unexpectedly");
-        }
     }
 
     private void SetState(LocalSendNodeState state, Exception? error = null)
@@ -624,6 +691,7 @@ public sealed class LocalSendNode : IAsyncDisposable
         if (!_started || State != LocalSendNodeState.Running) throw new InvalidOperationException("The LocalSend node is not running.");
     }
 
+    /// <summary>Stops the node and releases identities, sockets, channels, and synchronization resources.</summary>
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;

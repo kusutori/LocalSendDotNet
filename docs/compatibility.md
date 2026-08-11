@@ -24,4 +24,6 @@
 - Exercise missing, incorrect and correct PINs and the three-failure rate limit.
 - Confirm a mismatched HTTPS fingerprint is rejected before request content is sent.
 
+Execution status and reproducible CLI commands are maintained in [interop-matrix.md](interop-matrix.md).
+
 Protocol v3 will be added behind a new internal protocol adapter. Public `LocalSendNode` operations and version-neutral models must remain stable.

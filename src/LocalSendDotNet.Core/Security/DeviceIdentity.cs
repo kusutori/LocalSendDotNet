@@ -20,19 +20,35 @@ internal static class DeviceIdentityStore
 {
     private const string CertificateFile = "identity-certificate.pem";
     private const string PrivateKeyFile = "identity-private-key.pem";
+    private const string LockFile = ".identity.lock";
 
     public static async Task<DeviceIdentity> LoadOrCreateAsync(string dataDirectory, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(dataDirectory);
         var certificatePath = Path.Combine(dataDirectory, CertificateFile);
         var keyPath = Path.Combine(dataDirectory, PrivateKeyFile);
+        await using var identityLock = await AcquireLockAsync(Path.Combine(dataDirectory, LockFile), cancellationToken).ConfigureAwait(false);
 
-        if (File.Exists(certificatePath) && File.Exists(keyPath))
+        var certificateExists = File.Exists(certificatePath);
+        var keyExists = File.Exists(keyPath);
+        if (certificateExists != keyExists)
+            throw new IdentityLoadException($"The LocalSend identity in '{dataDirectory}' is incomplete. Restore or remove both identity PEM files.");
+
+        if (certificateExists)
         {
-            var certificatePem = await File.ReadAllTextAsync(certificatePath, cancellationToken).ConfigureAwait(false);
-            var keyPem = await File.ReadAllTextAsync(keyPath, cancellationToken).ConfigureAwait(false);
-            var loaded = X509Certificate2.CreateFromPem(certificatePem, keyPem);
-            return new DeviceIdentity(X509CertificateLoader.LoadPkcs12(loaded.Export(X509ContentType.Pkcs12), null));
+            try
+            {
+                var certificatePem = await File.ReadAllTextAsync(certificatePath, cancellationToken).ConfigureAwait(false);
+                var keyPem = await File.ReadAllTextAsync(keyPath, cancellationToken).ConfigureAwait(false);
+                using var loaded = X509Certificate2.CreateFromPem(certificatePem, keyPem);
+                if (!loaded.HasPrivateKey)
+                    throw new CryptographicException("The certificate does not have its matching private key.");
+                return new DeviceIdentity(X509CertificateLoader.LoadPkcs12(loaded.Export(X509ContentType.Pkcs12), null));
+            }
+            catch (Exception exception) when (exception is CryptographicException or IOException or UnauthorizedAccessException)
+            {
+                throw new IdentityLoadException($"The LocalSend identity in '{dataDirectory}' could not be loaded.", exception);
+            }
         }
 
         using var rsa = RSA.Create(2048);
@@ -42,10 +58,23 @@ internal static class DeviceIdentityStore
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
         using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(20));
 
-        await File.WriteAllTextAsync(certificatePath, generated.ExportCertificatePem(), cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(keyPath, rsa.ExportPkcs8PrivateKeyPem(), cancellationToken).ConfigureAwait(false);
-        RestrictPermissions(certificatePath, privateKey: false);
-        RestrictPermissions(keyPath, privateKey: true);
+        var suffix = Guid.NewGuid().ToString("N");
+        var temporaryCertificate = certificatePath + ".tmp-" + suffix;
+        var temporaryKey = keyPath + ".tmp-" + suffix;
+        try
+        {
+            await File.WriteAllTextAsync(temporaryCertificate, generated.ExportCertificatePem(), cancellationToken).ConfigureAwait(false);
+            await File.WriteAllTextAsync(temporaryKey, rsa.ExportPkcs8PrivateKeyPem(), cancellationToken).ConfigureAwait(false);
+            RestrictPermissions(temporaryCertificate, privateKey: false);
+            RestrictPermissions(temporaryKey, privateKey: true);
+            File.Move(temporaryCertificate, certificatePath);
+            File.Move(temporaryKey, keyPath);
+        }
+        finally
+        {
+            TryDelete(temporaryCertificate);
+            TryDelete(temporaryKey);
+        }
 
         return new DeviceIdentity(X509CertificateLoader.LoadPkcs12(generated.Export(X509ContentType.Pkcs12), null));
     }
@@ -68,6 +97,23 @@ internal static class DeviceIdentityStore
     }
 
     public static string Fingerprint(X509Certificate2 certificate) => Convert.ToHexString(SHA256.HashData(certificate.RawData));
+
+    private static async Task<FileStream> AcquireLockAsync(string path, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try { return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.Asynchronous); }
+            catch (IOException) { await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken).ConfigureAwait(false); }
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
 
     private static void RestrictPermissions(string path, bool privateKey)
     {

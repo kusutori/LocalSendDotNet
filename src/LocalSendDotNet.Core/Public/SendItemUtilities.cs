@@ -41,5 +41,6 @@ public static class LocalSendContentTypes
         [".gz"] = "application/gzip"
     };
 
+    /// <summary>Returns a common MIME type for a filename, or <c>application/octet-stream</c>.</summary>
     public static string GetForFileName(string fileName) => Known.GetValueOrDefault(Path.GetExtension(fileName), "application/octet-stream");
 }

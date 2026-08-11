@@ -12,42 +12,113 @@ internal sealed class V2MulticastDiscovery(
     LocalSendOptions options,
     Func<DeviceInfoDto> createAnnouncement,
     Func<DeviceInfoDto, IPAddress, CancellationToken, Task> onAnnouncement,
-    ILogger logger) : IAsyncDisposable
+    ILogger logger,
+    Func<IReadOnlyList<IPAddress>>? addressProvider = null) : IAsyncDisposable
 {
     private readonly CancellationTokenSource _stop = new();
     private readonly SemaphoreSlim _announceGate = new(1, 1);
+    private readonly SemaphoreSlim _receiverGate = new(1, 1);
     private readonly ConcurrentDictionary<IPAddress, byte> _registrations = new();
+    private readonly Func<IReadOnlyList<IPAddress>> _addressProvider = addressProvider ?? GetUsableAddresses;
     private Socket? _receiver;
+    private CancellationTokenSource? _receiverStop;
     private Task? _receiveLoop;
+    private IReadOnlyList<IPAddress> _joinedAddresses = [];
+    private int _refreshScheduled;
+    private bool _started;
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    internal IReadOnlyList<IPAddress> JoinedAddresses => _joinedAddresses;
+
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var receiver = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        receiver.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-        receiver.ExclusiveAddressUse = false;
-        receiver.Bind(new IPEndPoint(IPAddress.Any, options.Port));
-        var joined = 0;
-        foreach (var address in GetUsableAddresses())
+        try { await RefreshInterfacesAsync(force: true, requireInterface: true, cancellationToken).ConfigureAwait(false); }
+        catch (Exception exception) when (exception is SocketException or NetworkInformationException)
         {
-            try
-            {
-                receiver.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(options.MulticastAddress, address));
-                joined++;
-            }
-            catch (SocketException exception)
-            {
-                logger.LogDebug(exception, "Could not join LocalSend multicast on {Address}", address);
-            }
+            throw new DiscoveryUnavailableException($"UDP port {options.Port} could not start LocalSend discovery.", exception);
         }
-        if (joined == 0)
+        NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
+        _started = true;
+    }
+
+    internal Task<bool> RefreshInterfacesAsync(bool force, CancellationToken cancellationToken = default) =>
+        RefreshInterfacesAsync(force, requireInterface: false, cancellationToken);
+
+    private async Task<bool> RefreshInterfacesAsync(bool force, bool requireInterface, CancellationToken cancellationToken)
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token);
+        var addresses = _addressProvider().Distinct().OrderBy(static address => address.ToString(), StringComparer.Ordinal).ToArray();
+        await _receiverGate.WaitAsync(linked.Token).ConfigureAwait(false);
+        try
+        {
+            if (!force && addresses.SequenceEqual(_joinedAddresses))
+                return false;
+
+            Socket receiver;
+            IReadOnlyList<IPAddress> joinedAddresses;
+            try { (receiver, joinedAddresses) = CreateReceiver(addresses); }
+            catch (Exception exception) when (!requireInterface && exception is SocketException or DiscoveryUnavailableException)
+            {
+                logger.LogWarning(exception, "LocalSend discovery could not bind to the current network interfaces");
+                return false;
+            }
+
+            var receiverStop = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+            var receiveLoop = ReceiveLoopAsync(receiver, receiverStop.Token);
+            var oldReceiver = _receiver;
+            var oldStop = _receiverStop;
+            var oldLoop = _receiveLoop;
+            _receiver = receiver;
+            _receiverStop = receiverStop;
+            _receiveLoop = receiveLoop;
+            _joinedAddresses = joinedAddresses;
+
+            if (oldStop is not null)
+                await oldStop.CancelAsync().ConfigureAwait(false);
+            oldReceiver?.Dispose();
+            if (oldLoop is not null)
+            {
+                try { await oldLoop.ConfigureAwait(false); }
+                catch (ObjectDisposedException) { }
+            }
+            oldStop?.Dispose();
+            logger.LogInformation("LocalSend discovery is listening on {Count} IPv4 interface(s)", joinedAddresses.Count);
+            return true;
+        }
+        finally { _receiverGate.Release(); }
+    }
+
+    private (Socket Receiver, IReadOnlyList<IPAddress> JoinedAddresses) CreateReceiver(IReadOnlyCollection<IPAddress> addresses)
+    {
+        if (addresses.Count == 0)
+            throw new DiscoveryUnavailableException("No usable IPv4 interface is currently available.");
+        var receiver = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        try
+        {
+            receiver.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            receiver.ExclusiveAddressUse = false;
+            receiver.Bind(new IPEndPoint(IPAddress.Any, options.Port));
+            var joined = new List<IPAddress>();
+            foreach (var address in addresses)
+            {
+                try
+                {
+                    receiver.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(options.MulticastAddress, address));
+                    joined.Add(address);
+                }
+                catch (SocketException exception)
+                {
+                    logger.LogDebug(exception, "Could not join LocalSend multicast on {Address}", address);
+                }
+            }
+            if (joined.Count == 0)
+                throw new DiscoveryUnavailableException("No IPv4 interface could join the LocalSend multicast group.");
+            return (receiver, joined);
+        }
+        catch
         {
             receiver.Dispose();
-            throw new LocalSendException("No usable IPv4 interface could join the LocalSend multicast group.");
+            throw;
         }
-
-        _receiver = receiver;
-        _receiveLoop = ReceiveLoopAsync(receiver, _stop.Token);
-        return Task.CompletedTask;
     }
 
     public async Task AnnounceAsync(CancellationToken cancellationToken)
@@ -83,6 +154,7 @@ internal sealed class V2MulticastDiscovery(
                     _ = ObserveAnnouncementAsync(message, endpoint.Address, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
+            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) { break; }
             catch (JsonException exception)
             {
                 logger.LogDebug(exception, "Ignoring malformed LocalSend multicast announcement");
@@ -90,6 +162,8 @@ internal sealed class V2MulticastDiscovery(
             catch (Exception exception)
             {
                 logger.LogWarning(exception, "LocalSend multicast receive failed");
+                ScheduleRefresh();
+                break;
             }
         }
     }
@@ -104,7 +178,7 @@ internal sealed class V2MulticastDiscovery(
 
     private async Task SendOnAllInterfacesAsync(byte[] payload, CancellationToken cancellationToken)
     {
-        foreach (var address in GetUsableAddresses())
+        foreach (var address in _addressProvider())
         {
             try
             {
@@ -121,25 +195,58 @@ internal sealed class V2MulticastDiscovery(
         }
     }
 
-    private static IEnumerable<IPAddress> GetUsableAddresses() => NetworkInterface.GetAllNetworkInterfaces()
+    private void OnNetworkAddressChanged(object? sender, EventArgs eventArgs) => ScheduleRefresh();
+
+    private void ScheduleRefresh()
+    {
+        if (_stop.IsCancellationRequested || Interlocked.Exchange(ref _refreshScheduled, 1) != 0)
+            return;
+        _ = RefreshAfterNetworkChangeAsync();
+    }
+
+    private async Task RefreshAfterNetworkChangeAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(500), _stop.Token).ConfigureAwait(false);
+            await RefreshInterfacesAsync(force: true, _stop.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+        catch (Exception exception) { logger.LogWarning(exception, "LocalSend discovery network recovery failed"); }
+        finally { Interlocked.Exchange(ref _refreshScheduled, 0); }
+    }
+
+    private static IReadOnlyList<IPAddress> GetUsableAddresses() => NetworkInterface.GetAllNetworkInterfaces()
         .Where(static nic => nic.OperationalStatus == OperationalStatus.Up && nic.NetworkInterfaceType is not NetworkInterfaceType.Loopback and not NetworkInterfaceType.Tunnel)
         .SelectMany(static nic => nic.GetIPProperties().UnicastAddresses)
         .Select(static address => address.Address)
         .Where(static address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
-        .Distinct();
+        .Distinct()
+        .ToArray();
 
     public async ValueTask DisposeAsync()
     {
+        if (_started)
+            NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
         await _stop.CancelAsync().ConfigureAwait(false);
-        _receiver?.Dispose();
-        if (_receiveLoop is not null)
+        await _receiverGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            try { await _receiveLoop.ConfigureAwait(false); }
-            catch (ObjectDisposedException) { }
+            if (_receiverStop is not null)
+                await _receiverStop.CancelAsync().ConfigureAwait(false);
+            _receiver?.Dispose();
+            if (_receiveLoop is not null)
+            {
+                try { await _receiveLoop.ConfigureAwait(false); }
+                catch (ObjectDisposedException) { }
+            }
+            _receiverStop?.Dispose();
         }
+        finally { _receiverGate.Release(); }
         await _announceGate.WaitAsync().ConfigureAwait(false);
         _announceGate.Release();
         _stop.Dispose();
         _announceGate.Dispose();
+        _receiverGate.Dispose();
     }
 }

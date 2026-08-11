@@ -3,6 +3,7 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using LocalSendDotNet.Protocol.V2;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Hosting;
@@ -62,7 +63,11 @@ internal sealed class V2Server(
         app.MapPost(V2Constants.BasePath + "/upload", UploadAsync);
         app.MapPost(V2Constants.BasePath + "/cancel", CancelAsync);
         _application = app;
-        await app.StartAsync(cancellationToken).ConfigureAwait(false);
+        try { await app.StartAsync(cancellationToken).ConfigureAwait(false); }
+        catch (Exception exception) when (ContainsAddressInUse(exception))
+        {
+            throw new PortUnavailableException(options.Port, exception);
+        }
     }
 
     private async Task RegisterAsync(HttpContext context)
@@ -268,6 +273,16 @@ internal sealed class V2Server(
     {
         var address = context.Connection.RemoteIpAddress ?? IPAddress.None;
         return address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
+    }
+
+    private static bool ContainsAddressInUse(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is AddressInUseException || current is System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.AddressAlreadyInUse })
+                return true;
+        }
+        return false;
     }
 
     public async ValueTask DisposeAsync()

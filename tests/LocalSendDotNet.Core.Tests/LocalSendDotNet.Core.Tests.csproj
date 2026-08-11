@@ -9,5 +9,7 @@
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
     <ProjectReference Include="../../src/LocalSendDotNet.Core/LocalSendDotNet.Core.csproj" />
+    <None Include="PublicApiBaseline.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../../tools/LocalSendDotNet.ApiSurface/ApiSurface.cs" Link="ApiSurface.cs" />
   </ItemGroup>
 </Project>

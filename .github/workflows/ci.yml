@@ -20,3 +20,5 @@ jobs:
       - run: dotnet build LocalSendDotNet.slnx --no-restore --configuration Release
       - run: dotnet test LocalSendDotNet.slnx --no-build --configuration Release --filter "Skip!=Manual"
       - run: dotnet pack src/LocalSendDotNet.Core/LocalSendDotNet.Core.csproj --no-build --configuration Release --output artifacts
+      - run: dotnet restore samples/LocalSendDotNet.Sample/LocalSendDotNet.Sample.csproj --source artifacts --source https://api.nuget.org/v3/index.json
+      - run: dotnet build samples/LocalSendDotNet.Sample/LocalSendDotNet.Sample.csproj --no-restore --configuration Release

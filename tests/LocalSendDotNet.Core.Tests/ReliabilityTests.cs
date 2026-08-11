@@ -1,3 +1,9 @@
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using LocalSendDotNet.Protocol.V2;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace LocalSendDotNet.Core.Tests;
 
 public sealed class ReliabilityTests
@@ -110,4 +116,110 @@ public sealed class ReliabilityTests
         })
             Assert.Contains(method, methods);
     }
+
+    [Fact(Timeout = 15_000)]
+    public async Task DiscoveryReceiverCanRebindAfterInterfaceRefresh()
+    {
+        var addresses = NetworkInterface.GetAllNetworkInterfaces()
+            .Where(static nic => nic.OperationalStatus == OperationalStatus.Up && nic.NetworkInterfaceType is not NetworkInterfaceType.Loopback and not NetworkInterfaceType.Tunnel)
+            .SelectMany(static nic => nic.GetIPProperties().UnicastAddresses)
+            .Select(static item => item.Address)
+            .Where(static address => address.AddressFamily == AddressFamily.InterNetwork)
+            .Distinct()
+            .ToArray();
+        if (addresses.Length == 0)
+            return;
+        var root = TestDirectory.Create();
+        try
+        {
+            IReadOnlyList<IPAddress> supplied = [addresses[0]];
+            var options = TestOptions(GetFreeUdpPort(), root);
+            await using var discovery = new V2MulticastDiscovery(options, () => Announcement(options), (_, _, _) => Task.CompletedTask,
+                NullLogger.Instance, () => supplied);
+            await discovery.StartAsync(default);
+            Assert.Equal(supplied, discovery.JoinedAddresses);
+            supplied = [];
+            Assert.False(await discovery.RefreshInterfacesAsync(force: true));
+            Assert.NotEmpty(discovery.JoinedAddresses);
+            supplied = addresses;
+            Assert.True(await discovery.RefreshInterfacesAsync(force: true));
+            Assert.Equal(addresses.OrderBy(static address => address.ToString(), StringComparer.Ordinal), discovery.JoinedAddresses);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task OccupiedTcpPortProducesActionableException()
+    {
+        var root = TestDirectory.Create();
+        var listener = new TcpListener(IPAddress.IPv6Any, 0);
+        listener.Server.DualMode = true;
+        listener.Server.ExclusiveAddressUse = true;
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        await using var node = new LocalSendNode(TestOptions(port, root));
+        try
+        {
+            var exception = await Assert.ThrowsAsync<PortUnavailableException>(() => node.StartAsync());
+            Assert.Equal(port, exception.Port);
+            Assert.Equal(LocalSendNodeState.Faulted, node.State);
+            listener.Stop();
+            await node.StartAsync();
+            Assert.Equal(LocalSendNodeState.Running, node.State);
+            await node.StopAsync();
+        }
+        finally
+        {
+            listener.Stop();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact(Timeout = 20_000)]
+    public async Task CancelledStartupCleansUpAndCanBeRetried()
+    {
+        var root = TestDirectory.Create();
+        await using var node = new LocalSendNode(TestOptions(GetFreeTcpPort(), root));
+        try
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => node.StartAsync(cancellation.Token));
+            Assert.Equal(LocalSendNodeState.Created, node.State);
+            await node.StartAsync();
+            Assert.Equal(LocalSendNodeState.Running, node.State);
+            await node.StopAsync();
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    private static int GetFreeUdpPort()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        return ((IPEndPoint)socket.LocalEndPoint!).Port;
+    }
+
+    private static int GetFreeTcpPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private static LocalSendOptions TestOptions(int port, string? root = null)
+    {
+        root ??= TestDirectory.Create();
+        return new LocalSendOptions { Alias = "test", DataDirectory = Path.Combine(root, "data"), DownloadDirectory = Path.Combine(root, "downloads"), Port = port };
+    }
+
+    private static DeviceInfoDto Announcement(LocalSendOptions options) => new()
+    {
+        Alias = options.Alias,
+        Version = "2.2",
+        Fingerprint = new string('A', 64),
+        Port = options.Port,
+        Protocol = "https"
+    };
 }

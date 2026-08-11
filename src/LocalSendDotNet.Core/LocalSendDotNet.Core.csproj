@@ -4,7 +4,7 @@
     <RootNamespace>LocalSendDotNet</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>LocalSendDotNet.Core</PackageId>
-    <Version>0.2.0-preview.1</Version>
+    <Version>0.2.0-preview.2</Version>
     <Description>A UI-independent .NET implementation of the LocalSend v2.2 protocol.</Description>
     <Authors>LocalSendDotNet contributors</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
@@ -14,13 +14,14 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" Condition="'$(CI)' == 'true'" />
     <None Include="../../README.md" Pack="true" PackagePath="/" />
     <None Include="../../docs/core-api.md" Pack="true" PackagePath="docs/" />
+    <None Include="../../docs/compatibility.md" Pack="true" PackagePath="docs/" />
+    <None Include="../../docs/interop-matrix.md" Pack="true" PackagePath="docs/" />
     <None Include="../../CHANGELOG.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>

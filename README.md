@@ -14,7 +14,9 @@ An experimental, UI-independent .NET 10 implementation of the LocalSend v2.2 pro
 - Folder enumeration with relative paths and common MIME type inference
 - Diagnostic CLI for discovery and interoperability testing
 
-Browser sharing, WebRTC, protocol v1, IPv6 discovery, subnet scanning, history and UI are intentionally out of scope for the first preview.
+## Roadmap boundaries
+
+The UI-ready v2 send/receive core is implemented. Browser sharing, IPv6 discovery and subnet scanning are later v2 extensions rather than UI blockers. Protocol v1 is legacy-only, transfer history belongs to the host application, and WebRTC work waits for a stable official v3 design.
 
 ## Build
 
@@ -52,6 +54,10 @@ await foreach (var request in node.WatchIncomingTransfersAsync(cancellationToken
 ```
 
 See [docs/core-api.md](docs/core-api.md) for lifecycle, discovery, send/receive, cancellation and manual-address guidance.
+
+`samples/LocalSendDotNet.Sample` references the generated NuGet package rather than the source project. It is built in CI after packing to verify the consumer experience.
+
+Official-client evidence and the remaining manual scenarios are tracked in [docs/interop-matrix.md](docs/interop-matrix.md).
 
 The library requires the .NET 10 and ASP.NET Core 10 shared frameworks for framework-dependent deployments. Self-contained applications include these dependencies automatically.
 

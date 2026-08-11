@@ -7,4 +7,7 @@
     <Project Path="tests/LocalSendDotNet.Core.Tests/LocalSendDotNet.Core.Tests.csproj" />
     <Project Path="tests/LocalSendDotNet.InteropTests/LocalSendDotNet.InteropTests.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/LocalSendDotNet.ApiSurface/LocalSendDotNet.ApiSurface.csproj" />
+  </Folder>
 </Solution>

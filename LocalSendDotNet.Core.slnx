@@ -1,6 +1,5 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/LocalSendDotNet.App/LocalSendDotNet.App.csproj" />
     <Project Path="src/LocalSendDotNet.Core/LocalSendDotNet.Core.csproj" />
     <Project Path="src/LocalSendDotNet.Cli/LocalSendDotNet.Cli.csproj" />
   </Folder>

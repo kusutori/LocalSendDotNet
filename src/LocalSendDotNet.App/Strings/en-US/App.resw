@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Accept" xml:space="preserve"><value>Accept</value></data>
+  <data name="Add" xml:space="preserve"><value>Add</value></data>
+  <data name="AddFavoriteTitle" xml:space="preserve"><value>Add to favorites</value></data>
+  <data name="AddFolder" xml:space="preserve"><value>Add folder</value></data>
+  <data name="AutoSaveDescription" xml:space="preserve"><value>Choose how incoming content is handled.</value></data>
+  <data name="AutoSaveFavorites" xml:space="preserve"><value>Favorites</value></data>
+  <data name="AutoSaveOff" xml:space="preserve"><value>Off</value></data>
+  <data name="AutoSaveOn" xml:space="preserve"><value>On</value></data>
+  <data name="AutoSaveTitle" xml:space="preserve"><value>Auto save</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="CancelCurrentSend" xml:space="preserve"><value>Cancel current send</value></data>
+  <data name="CancelCurrentTransfer" xml:space="preserve"><value>Cancel current transfer</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="CancellingTransfer" xml:space="preserve"><value>Cancelling transfer…</value></data>
+  <data name="Change" xml:space="preserve"><value>Change…</value></data>
+  <data name="ChangeSaveLocation" xml:space="preserve"><value>Change the location where received files are saved</value></data>
+  <data name="ChooseContent" xml:space="preserve"><value>Choose content</value></data>
+  <data name="ChooseItem" xml:space="preserve"><value>Choose {item}</value></data>
+  <data name="Clear" xml:space="preserve"><value>Clear</value></data>
+  <data name="Clipboard" xml:space="preserve"><value>Clipboard</value></data>
+  <data name="ClipboardEmpty" xml:space="preserve"><value>The clipboard has no text, files, or folders that can be sent.</value></data>
+  <data name="ClipboardImage" xml:space="preserve"><value>Clipboard image</value></data>
+  <data name="ClipboardReadFailed" xml:space="preserve"><value>Could not read the clipboard: {error}</value></data>
+  <data name="ClipboardText" xml:space="preserve"><value>Clipboard text</value></data>
+  <data name="Close" xml:space="preserve"><value>Close</value></data>
+  <data name="ContentManyItems" xml:space="preserve"><value>{count} items</value></data>
+  <data name="ContentOneFile" xml:space="preserve"><value>File {file}</value></data>
+  <data name="ContentOneTextMessage" xml:space="preserve"><value>A text message</value></data>
+  <data name="ContentSaved" xml:space="preserve"><value>Content saved.</value></data>
+  <data name="Copied" xml:space="preserve"><value>Copied</value></data>
+  <data name="Copy" xml:space="preserve"><value>Copy</value></data>
+  <data name="CopyReceivedText" xml:space="preserve"><value>Copy received text</value></data>
+  <data name="Decline" xml:space="preserve"><value>Decline</value></data>
+  <data name="DeviceDesktop" xml:space="preserve"><value>Desktop</value></data>
+  <data name="DeviceHeadless" xml:space="preserve"><value>Headless device</value></data>
+  <data name="DeviceMobile" xml:space="preserve"><value>Mobile device</value></data>
+  <data name="DeviceName" xml:space="preserve"><value>Device name</value></data>
+  <data name="DeviceServer" xml:space="preserve"><value>Server</value></data>
+  <data name="DeviceWeb" xml:space="preserve"><value>Web device</value></data>
+  <data name="EditFavorite" xml:space="preserve"><value>Edit favorite</value></data>
+  <data name="EditFavoriteDevice" xml:space="preserve"><value>Edit favorite {device}</value></data>
+  <data name="EditFavoriteTitle" xml:space="preserve"><value>Edit favorite device</value></data>
+  <data name="FavoriteDevice" xml:space="preserve"><value>Favorite {device}</value></data>
+  <data name="FavoriteDeviceName" xml:space="preserve"><value>Favorite device name</value></data>
+  <data name="FavoriteIpAddress" xml:space="preserve"><value>Favorite device IP address</value></data>
+  <data name="FavoritePort" xml:space="preserve"><value>Favorite device port</value></data>
+  <data name="File" xml:space="preserve"><value>File</value></data>
+  <data name="Fingerprint" xml:space="preserve"><value>Fingerprint  {fingerprint}…</value></data>
+  <data name="Folder" xml:space="preserve"><value>Folder</value></data>
+  <data name="FolderEmpty" xml:space="preserve"><value>The selected folder has no files that can be sent.</value></data>
+  <data name="IdentityLoading" xml:space="preserve"><value>Loading identity…</value></data>
+  <data name="IncomingFileSummary" xml:space="preserve"><value>Wants to send you the file {file}.</value></data>
+  <data name="IncomingItemsSummary" xml:space="preserve"><value>Wants to send you {count} items.</value></data>
+  <data name="IncomingTextSummary" xml:space="preserve"><value>Wants to send you a text message.</value></data>
+  <data name="InvalidIpAddress" xml:space="preserve"><value>Enter a valid IP address.</value></data>
+  <data name="InvalidPort" xml:space="preserve"><value>Port must be between 1 and 65535.</value></data>
+  <data name="IpAddress" xml:space="preserve"><value>IP address</value></data>
+  <data name="ItemKindAndSize" xml:space="preserve"><value>{kind} · {size}</value></data>
+  <data name="ItemsAdded" xml:space="preserve"><value>Added {count} items</value></data>
+  <data name="LanguageChinese" xml:space="preserve"><value>简体中文</value></data>
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="MoreItems" xml:space="preserve"><value>{count} more…</value></data>
+  <data name="Name" xml:space="preserve"><value>Name</value></data>
+  <data name="NavReceive" xml:space="preserve"><value>Receive</value></data>
+  <data name="NavSend" xml:space="preserve"><value>Send</value></data>
+  <data name="NavSettings" xml:space="preserve"><value>Settings</value></data>
+  <data name="NearbyDevices" xml:space="preserve"><value>Nearby devices</value></data>
+  <data name="NetworkStartFailed" xml:space="preserve"><value>Could not start the network service</value></data>
+  <data name="NodeDisconnected" xml:space="preserve"><value>Disconnected</value></data>
+  <data name="NodeFaulted" xml:space="preserve"><value>Network service unavailable</value></data>
+  <data name="NodeRunning" xml:space="preserve"><value>Connected to the local network</value></data>
+  <data name="NodeStarting" xml:space="preserve"><value>Starting…</value></data>
+  <data name="NodeStopping" xml:space="preserve"><value>Stopping…</value></data>
+  <data name="NothingSelected" xml:space="preserve"><value>Nothing selected</value></data>
+  <data name="OptionSystem" xml:space="preserve"><value>Use system setting</value></data>
+  <data name="PageNotFound" xml:space="preserve"><value>Page not found.</value></data>
+  <data name="PendingRequests" xml:space="preserve"><value>{count} pending requests</value></data>
+  <data name="PickFileFailed" xml:space="preserve"><value>Could not select file: {error}</value></data>
+  <data name="PickFolderFailed" xml:space="preserve"><value>Could not select folder: {error}</value></data>
+  <data name="PinIncorrect" xml:space="preserve"><value>Incorrect PIN. Try again.</value></data>
+  <data name="Pin" xml:space="preserve"><value>PIN</value></data>
+  <data name="PinPlaceholder" xml:space="preserve"><value>Enter PIN</value></data>
+  <data name="PinRateLimited" xml:space="preserve"><value>Too many PIN attempts. Try again later.</value></data>
+  <data name="PinRequiredMessage" xml:space="preserve"><value>{device} requires a receive PIN.</value></data>
+  <data name="PinRequiredTitle" xml:space="preserve"><value>PIN required</value></data>
+  <data name="Port" xml:space="preserve"><value>Port</value></data>
+  <data name="PortInUseHint" xml:space="preserve"><value>Check whether port 53317 is in use by another LocalSend instance.</value></data>
+  <data name="PreparingForDevice" xml:space="preserve"><value>Preparing to send to {device}…</value></data>
+  <data name="ReceiveCancelled" xml:space="preserve"><value>Receive cancelled.</value></data>
+  <data name="ReceivedMessage" xml:space="preserve"><value>Sent you a message:</value></data>
+  <data name="ReceivedTextContent" xml:space="preserve"><value>Received text content</value></data>
+  <data name="ReceiveFailed" xml:space="preserve"><value>Receive failed.</value></data>
+  <data name="ReceiveTitle" xml:space="preserve"><value>Receive</value></data>
+  <data name="ReceivingContent" xml:space="preserve"><value>Receiving content…</value></data>
+  <data name="ReceivingPreparing" xml:space="preserve"><value>Preparing to receive…</value></data>
+  <data name="RefreshDevices" xml:space="preserve"><value>Refresh nearby devices</value></data>
+  <data name="Remove" xml:space="preserve"><value>Remove</value></data>
+  <data name="RemoveItem" xml:space="preserve"><value>Remove {item}</value></data>
+  <data name="Retry" xml:space="preserve"><value>Retry</value></data>
+  <data name="SameNetworkHint" xml:space="preserve"><value>Make sure the target device is connected to the same Wi-Fi network.</value></data>
+  <data name="Save" xml:space="preserve"><value>Save</value></data>
+  <data name="SearchingDevices" xml:space="preserve"><value>Looking for nearby devices</value></data>
+  <data name="SelectContentFirst" xml:space="preserve"><value>Choose something to send first.</value></data>
+  <data name="SelectedItems" xml:space="preserve"><value>{count} items selected · {size}</value></data>
+  <data name="SendCancelled" xml:space="preserve"><value>Send cancelled</value></data>
+  <data name="SendFailed" xml:space="preserve"><value>Send failed</value></data>
+  <data name="SendHint" xml:space="preserve"><value>Choose content, then select a nearby device to send it.</value></data>
+  <data name="SendingPreparing" xml:space="preserve"><value>Preparing to send…</value></data>
+  <data name="SendingTitle" xml:space="preserve"><value>Sending</value></data>
+  <data name="SendingToDevice" xml:space="preserve"><value>Sending to {device}…</value></data>
+  <data name="SendingTransferring" xml:space="preserve"><value>Transferring…</value></data>
+  <data name="SendingWaiting" xml:space="preserve"><value>Waiting for a response…</value></data>
+  <data name="SendTextPlaceholder" xml:space="preserve"><value>Enter text to send…</value></data>
+  <data name="SendTextTitle" xml:space="preserve"><value>Send text</value></data>
+  <data name="SendTitle" xml:space="preserve"><value>Send</value></data>
+  <data name="SendToDevice" xml:space="preserve"><value>Send to {device}</value></data>
+  <data name="SentToDevice" xml:space="preserve"><value>Successfully sent to {device}.</value></data>
+  <data name="SettingsAnimations" xml:space="preserve"><value>Animations</value></data>
+  <data name="SettingsAnimationsDescription" xml:space="preserve"><value>Enable page transitions and status animations.</value></data>
+  <data name="SettingsAutoSave" xml:space="preserve"><value>Auto save</value></data>
+  <data name="SettingsAutoSaveDescription" xml:space="preserve"><value>Automatically accept and save incoming content.</value></data>
+  <data name="SettingsDeviceName" xml:space="preserve"><value>Device name</value></data>
+  <data name="SettingsDeviceNameDescription" xml:space="preserve"><value>Other devices see this name; restart the app after changing it.</value></data>
+  <data name="SettingsFavoritesOnly" xml:space="preserve"><value>Only auto-receive from favorites</value></data>
+  <data name="SettingsFavoritesOnlyDescription" xml:space="preserve"><value>When auto save is on, trust only devices in your favorites.</value></data>
+  <data name="SettingsGeneral" xml:space="preserve"><value>General</value></data>
+  <data name="SettingsLanguage" xml:space="preserve"><value>Language</value></data>
+  <data name="SettingsLanguageDescription" xml:space="preserve"><value>Change the language used by the interface.</value></data>
+  <data name="SettingsMinimizeToTray" xml:space="preserve"><value>Minimize to the system tray when closing</value></data>
+  <data name="SettingsMinimizeToTrayDescription" xml:space="preserve"><value>Keep receiving in the background when the main window closes.</value></data>
+  <data name="SettingsReceive" xml:space="preserve"><value>Receive</value></data>
+  <data name="SettingsSaveLocation" xml:space="preserve"><value>Save location</value></data>
+  <data name="SettingsStartWithWindows" xml:space="preserve"><value>Start after signing in</value></data>
+  <data name="SettingsStartWithWindowsDescription" xml:space="preserve"><value>Run LocalSend automatically after signing in to Windows.</value></data>
+  <data name="SettingsTheme" xml:space="preserve"><value>Theme</value></data>
+  <data name="SettingsThemeDescription" xml:space="preserve"><value>Choose the app''s light or dark appearance.</value></data>
+  <data name="SettingsTitle" xml:space="preserve"><value>Settings</value></data>
+  <data name="Tagline" xml:space="preserve"><value>Secure, fast local network transfers</value></data>
+  <data name="TargetDevice" xml:space="preserve"><value>Target device</value></data>
+  <data name="TargetRequiresPin" xml:space="preserve"><value>The target device requires a PIN.</value></data>
+  <data name="Text" xml:space="preserve"><value>Text</value></data>
+  <data name="TextAvailableAfterAccept" xml:space="preserve"><value>The complete text will appear after you accept.</value></data>
+  <data name="TextContent" xml:space="preserve"><value>Text content</value></data>
+  <data name="TextMessage" xml:space="preserve"><value>Text message</value></data>
+  <data name="TextReceived" xml:space="preserve"><value>Text received.</value></data>
+  <data name="ThemeDark" xml:space="preserve"><value>Dark</value></data>
+  <data name="ThemeLight" xml:space="preserve"><value>Light</value></data>
+  <data name="ThisDevice" xml:space="preserve"><value>This device</value></data>
+  <data name="TransferCancelled" xml:space="preserve"><value>Transfer cancelled.</value></data>
+  <data name="TransferComplete" xml:space="preserve"><value>Transfer complete</value></data>
+  <data name="TransferFailed" xml:space="preserve"><value>Transfer failed.</value></data>
+  <data name="TransferPreparing" xml:space="preserve"><value>Preparing</value></data>
+  <data name="TransferTransferring" xml:space="preserve"><value>Transferring</value></data>
+  <data name="TransferWaiting" xml:space="preserve"><value>Waiting for acceptance</value></data>
+  <data name="WaitingForDevice" xml:space="preserve"><value>Waiting for {device} to accept…</value></data>
+  <data name="WantsToSendMessage" xml:space="preserve"><value>Wants to send you a message:</value></data>
+  <data name="WindowUnavailable" xml:space="preserve"><value>The current Reactor window is unavailable.</value></data>
+</root>

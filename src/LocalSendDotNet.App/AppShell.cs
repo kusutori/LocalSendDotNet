@@ -1,18 +1,54 @@
 using LocalSendDotNet;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
+using Microsoft.UI.Reactor.Localization;
 using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.Globalization;
 using static Microsoft.UI.Reactor.Factories;
 
 sealed class AppShell : Component
 {
+    private static readonly ReswResourceProvider Resources = new(defaultLocale: "en-US");
+
     public override Element Render()
     {
-        var navigation = UseNavigation(AppRoute.Receive);
         var (settings, updateSettings) = UseReducer(AppSettings.Default);
+
+        var locale = settings.LanguageIndex switch
+        {
+            1 => "zh-CN",
+            2 => "en-US",
+            _ => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals(
+                "zh",
+                StringComparison.OrdinalIgnoreCase)
+                    ? "zh-CN"
+                    : "en-US",
+        };
+
+        return LocaleProvider(
+            locale,
+            Component<LocalizedAppShell, LocalizedAppShellProps>(new(settings, updateSettings)),
+            Resources,
+            defaultLocale: "en-US");
+    }
+}
+
+sealed record LocalizedAppShellProps(
+    AppSettings Settings,
+    Action<Func<AppSettings, AppSettings>> UpdateSettings);
+
+sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
+{
+    public override Element Render()
+    {
+        var t = UseIntl();
+        var settings = Props.Settings;
+        var updateSettings = Props.UpdateSettings;
+        var navigation = UseNavigation(AppRoute.Receive);
         var (runtime, updateRuntime) = UseReducer(AppRuntimeState.Initial);
+        var (outgoingTransfer, setOutgoingTransfer) = UseState<OutgoingTransferViewState?>(null);
         var nodeRef = UseRef<LocalSendNode?>(null);
 
         UseEffect(() =>
@@ -28,8 +64,8 @@ sealed class AppShell : Component
 
         var titleBar = (TitleBar("LocalSend") with
         {
-            Subtitle = "安全、快速的局域网传输",
-            RightHeader = Caption(NodeStatusText(runtime.NodeState))
+            Subtitle = t.Message(new("App", "Tagline")),
+            RightHeader = Caption(NodeStatusText(t, runtime.NodeState))
                 .Foreground(runtime.Error is null ? Theme.SecondaryText : Theme.SystemCritical),
         }).Flex(shrink: 0);
 
@@ -42,11 +78,12 @@ sealed class AppShell : Component
             AppRoute.Send => Component<SendPage, SendPageProps>(new(
                 runtime,
                 nodeRef.Current,
-                RefreshAsync)),
+                RefreshAsync,
+                setOutgoingTransfer)),
             AppRoute.Settings => Component<SettingsPage, SettingsPageProps>(new(
                 settings,
                 updateSettings)),
-            _ => TextBlock("找不到此页面。"),
+            _ => TextBlock(t.Message(new("App", "PageNotFound"))),
         }) with
         {
             CacheMode = NavigationCacheMode.Enabled,
@@ -58,17 +95,12 @@ sealed class AppShell : Component
 
         var navigationView = (NavigationView(
             [
-                NavItem("接收", icon: "Download", tag: RouteTag(AppRoute.Receive)),
-                NavItem("发送", icon: "Send", tag: RouteTag(AppRoute.Send)),
-                NavItem("设置", icon: "Setting", tag: RouteTag(AppRoute.Settings)),
+                NavItem(t.Message(new("App", "NavReceive")), icon: "\uE701", tag: RouteTag(AppRoute.Receive)),
+                NavItem(t.Message(new("App", "NavSend")), icon: "Send", tag: RouteTag(AppRoute.Send)),
+                NavItem(t.Message(new("App", "NavSettings")), icon: "Setting", tag: RouteTag(AppRoute.Settings)),
             ],
             content)
             .WithNavigation(navigation, RouteTag, ParseRoute)
-            .PaneHeader(
-                VStack(4,
-                    Title("LocalSend"),
-                    Caption("LocalSendDotNet").Foreground(Theme.SecondaryText))
-                .Padding(left: 8, top: 24, right: 8, bottom: 20))
             .PaneDisplayMode(NavigationViewPaneDisplayMode.Left)
             .OpenPaneLength(248)
             .CompactPaneLength(56)
@@ -81,7 +113,28 @@ sealed class AppShell : Component
             IsSettingsVisible = false,
         };
 
-        var root = FlexColumn(titleBar, navigationView)
+        var pendingIncoming = runtime.IncomingTransfers.FirstOrDefault();
+        Element? transferOverlay = pendingIncoming is not null && nodeRef.Current is { } node
+            ? Component<IncomingTransferOverlay, IncomingTransferOverlayProps>(new(
+                    node,
+                    pendingIncoming,
+                    settings.DownloadDirectory,
+                    DismissIncoming))
+                .WithKey(pendingIncoming.RequestId.ToString("N"))
+            : outgoingTransfer is not null
+                ? Component<OutgoingTransferOverlay, OutgoingTransferOverlayProps>(new(
+                    outgoingTransfer,
+                    () => setOutgoingTransfer(null)))
+                : null;
+
+        var contentLayer = Grid(
+                columns: [GridSize.Star()],
+                rows: [GridSize.Star()],
+                navigationView.Grid(row: 0, column: 0),
+                transferOverlay?.Grid(row: 0, column: 0))
+            .Flex(grow: 1, basis: 0);
+
+        var root = FlexColumn(titleBar, contentLayer)
             .RequestedTheme(settings.ThemeIndex switch
             {
                 1 => ElementTheme.Light,
@@ -91,6 +144,16 @@ sealed class AppShell : Component
             .Backdrop(BackdropKind.Mica);
 
         return root;
+
+        void DismissIncoming(Guid requestId)
+        {
+            updateRuntime(current => current with
+            {
+                IncomingTransfers = current.IncomingTransfers
+                    .Where(request => request.RequestId != requestId)
+                    .ToArray(),
+            });
+        }
 
         async Task RunNodeAsync(CancellationToken cancellationToken)
         {
@@ -212,12 +275,12 @@ sealed class AppShell : Component
         _ => AppRoute.Receive,
     };
 
-    private static string NodeStatusText(LocalSendNodeState state) => state switch
+    private static string NodeStatusText(IntlAccessor t, LocalSendNodeState state) => state switch
     {
-        LocalSendNodeState.Starting => "正在启动…",
-        LocalSendNodeState.Running => "已连接到本地网络",
-        LocalSendNodeState.Faulted => "网络服务不可用",
-        LocalSendNodeState.Stopping => "正在停止…",
-        _ => "未连接",
+        LocalSendNodeState.Starting => t.Message(new("App", "NodeStarting")),
+        LocalSendNodeState.Running => t.Message(new("App", "NodeRunning")),
+        LocalSendNodeState.Faulted => t.Message(new("App", "NodeFaulted")),
+        LocalSendNodeState.Stopping => t.Message(new("App", "NodeStopping")),
+        _ => t.Message(new("App", "NodeDisconnected")),
     };
 }

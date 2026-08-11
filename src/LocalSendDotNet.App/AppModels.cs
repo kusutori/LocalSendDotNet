@@ -53,3 +53,15 @@ sealed record AppRuntimeState(
         IncomingTransfers: Array.Empty<IncomingTransferRequest>(),
         Error: null);
 }
+
+sealed record OutgoingTransferViewState(
+    LocalSendIdentity? Sender,
+    LocalSendDevice Receiver,
+    string ContentSummary,
+    TransferState State,
+    long BytesTransferred,
+    long TotalBytes,
+    string Status,
+    bool IsPending,
+    bool IsError,
+    Action Cancel);

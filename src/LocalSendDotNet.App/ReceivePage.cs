@@ -16,17 +16,19 @@ sealed class ReceivePage : Component<ReceivePageProps>
 {
     public override Element Render()
     {
+        var t = UseIntl();
         var autoSaveItems = UseMemo(() => new object[]
         {
-            new SegmentedItem { Content = "关闭" },
-            new SegmentedItem { Content = "收藏设备" },
-            new SegmentedItem { Content = "开启" },
-        }, []);
+            new SegmentedItem { Content = t.Message(new("App", "AutoSaveOff")) },
+            new SegmentedItem { Content = t.Message(new("App", "AutoSaveFavorites")) },
+            new SegmentedItem { Content = t.Message(new("App", "AutoSaveOn")) },
+        }, t.Locale);
         var identity = Props.Runtime.Identity;
         var alias = identity?.Alias ?? Props.Settings.Alias;
         var fingerprint = identity?.Fingerprint;
+        var fingerprintPreview = fingerprint is null ? null : fingerprint[..12];
         var shortId = fingerprint is null
-            ? "正在载入身份…"
+            ? t.Message(new("App", "IdentityLoading"))
             : $"#{Convert.ToInt32(fingerprint[..4], 16) % 1000:D3}  #1";
 
         var identityPanel = FlexColumn(
@@ -41,7 +43,9 @@ sealed class ReceivePage : Component<ReceivePageProps>
                 .HAlign(HorizontalAlignment.Center),
             fingerprint is null
                 ? null
-                : Caption($"Fingerprint  {fingerprint[..12]}…")
+                : Caption(t.Message(
+                        new("App", "Fingerprint"),
+                        ("fingerprint", fingerprintPreview!)))
                     .Foreground(Theme.TertiaryText)
                     .HAlign(HorizontalAlignment.Center)) with
         {
@@ -53,13 +57,15 @@ sealed class ReceivePage : Component<ReceivePageProps>
             FlexColumn(
                 FlexRow(
                     VStack(4,
-                        Subtitle("自动保存"),
-                        TextBlock("选择收到内容时的处理方式。")
+                        Subtitle(t.Message(new("App", "AutoSaveTitle"))),
+                        TextBlock(t.Message(new("App", "AutoSaveDescription")))
                             .Foreground(Theme.SecondaryText))
                         .Flex(grow: 1, basis: 0),
                     Props.Runtime.IncomingTransfers.Count > 0
                         ? InfoBadge(Props.Runtime.IncomingTransfers.Count)
-                            .AutomationName($"{Props.Runtime.IncomingTransfers.Count} 个待处理请求")
+                            .AutomationName(t.Message(
+                                new("App", "PendingRequests"),
+                                ("count", Props.Runtime.IncomingTransfers.Count)))
                         : null) with
                 {
                     AlignItems = FlexAlign.Center,
@@ -79,7 +85,7 @@ sealed class ReceivePage : Component<ReceivePageProps>
 
         var page = ScrollView(
             FlexColumn(
-                Heading("接收")
+                Heading(t.Message(new("App", "ReceiveTitle")))
                     .HeadingLevel(AutomationHeadingLevel.Level1),
                 identityPanel.Flex(grow: 1, basis: 0),
                 autoSave) with

@@ -49,6 +49,11 @@
         <ProjectReference Include="..\LocalSendDotNet.Core\LocalSendDotNet.Core.csproj" />
     </ItemGroup>
 
+    <!-- ReswResourceProvider reads the source .resw files at runtime. -->
+    <ItemGroup>
+        <Content Include="Strings\**\*.resw" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
     <!--
         Debug-only: enable the Reactor devtools surface so the *devtools* flag
         (from Properties/launchSettings.json's default F5 args) lights up the

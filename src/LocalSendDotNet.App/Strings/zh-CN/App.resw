@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Accept" xml:space="preserve"><value>接受</value></data>
+  <data name="Add" xml:space="preserve"><value>添加</value></data>
+  <data name="AddFavoriteTitle" xml:space="preserve"><value>添加到收藏夹</value></data>
+  <data name="AddFolder" xml:space="preserve"><value>添加文件夹</value></data>
+  <data name="AutoSaveDescription" xml:space="preserve"><value>选择收到内容时的处理方式。</value></data>
+  <data name="AutoSaveFavorites" xml:space="preserve"><value>收藏设备</value></data>
+  <data name="AutoSaveOff" xml:space="preserve"><value>关闭</value></data>
+  <data name="AutoSaveOn" xml:space="preserve"><value>开启</value></data>
+  <data name="AutoSaveTitle" xml:space="preserve"><value>自动保存</value></data>
+  <data name="Cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="CancelCurrentSend" xml:space="preserve"><value>取消当前发送</value></data>
+  <data name="CancelCurrentTransfer" xml:space="preserve"><value>取消当前传输</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>已取消</value></data>
+  <data name="CancellingTransfer" xml:space="preserve"><value>正在取消传输…</value></data>
+  <data name="Change" xml:space="preserve"><value>更改…</value></data>
+  <data name="ChangeSaveLocation" xml:space="preserve"><value>更改接收文件保存位置</value></data>
+  <data name="ChooseContent" xml:space="preserve"><value>选择内容</value></data>
+  <data name="ChooseItem" xml:space="preserve"><value>选择{item}</value></data>
+  <data name="Clear" xml:space="preserve"><value>清空</value></data>
+  <data name="Clipboard" xml:space="preserve"><value>剪贴板</value></data>
+  <data name="ClipboardEmpty" xml:space="preserve"><value>剪贴板中没有可发送的文本、文件或文件夹。</value></data>
+  <data name="ClipboardImage" xml:space="preserve"><value>剪贴板图片</value></data>
+  <data name="ClipboardReadFailed" xml:space="preserve"><value>无法读取剪贴板：{error}</value></data>
+  <data name="ClipboardText" xml:space="preserve"><value>剪贴板文本</value></data>
+  <data name="Close" xml:space="preserve"><value>关闭</value></data>
+  <data name="ContentManyItems" xml:space="preserve"><value>{count} 个项目</value></data>
+  <data name="ContentOneFile" xml:space="preserve"><value>文件 {file}</value></data>
+  <data name="ContentOneTextMessage" xml:space="preserve"><value>一条文本消息</value></data>
+  <data name="ContentSaved" xml:space="preserve"><value>内容已保存。</value></data>
+  <data name="Copied" xml:space="preserve"><value>已复制</value></data>
+  <data name="Copy" xml:space="preserve"><value>复制</value></data>
+  <data name="CopyReceivedText" xml:space="preserve"><value>复制收到的文本</value></data>
+  <data name="Decline" xml:space="preserve"><value>拒绝</value></data>
+  <data name="DeviceDesktop" xml:space="preserve"><value>桌面设备</value></data>
+  <data name="DeviceHeadless" xml:space="preserve"><value>无界面设备</value></data>
+  <data name="DeviceMobile" xml:space="preserve"><value>移动设备</value></data>
+  <data name="DeviceName" xml:space="preserve"><value>设备名称</value></data>
+  <data name="DeviceServer" xml:space="preserve"><value>服务器</value></data>
+  <data name="DeviceWeb" xml:space="preserve"><value>网页设备</value></data>
+  <data name="EditFavorite" xml:space="preserve"><value>编辑收藏</value></data>
+  <data name="EditFavoriteDevice" xml:space="preserve"><value>编辑收藏 {device}</value></data>
+  <data name="EditFavoriteTitle" xml:space="preserve"><value>编辑收藏设备</value></data>
+  <data name="FavoriteDevice" xml:space="preserve"><value>收藏 {device}</value></data>
+  <data name="FavoriteDeviceName" xml:space="preserve"><value>收藏设备名称</value></data>
+  <data name="FavoriteIpAddress" xml:space="preserve"><value>收藏设备 IP 地址</value></data>
+  <data name="FavoritePort" xml:space="preserve"><value>收藏设备端口</value></data>
+  <data name="File" xml:space="preserve"><value>文件</value></data>
+  <data name="Fingerprint" xml:space="preserve"><value>指纹  {fingerprint}…</value></data>
+  <data name="Folder" xml:space="preserve"><value>文件夹</value></data>
+  <data name="FolderEmpty" xml:space="preserve"><value>所选文件夹中没有可发送的文件。</value></data>
+  <data name="IdentityLoading" xml:space="preserve"><value>正在载入身份…</value></data>
+  <data name="IncomingFileSummary" xml:space="preserve"><value>想要发送给你文件 {file}。</value></data>
+  <data name="IncomingItemsSummary" xml:space="preserve"><value>想要发送给你 {count} 个项目。</value></data>
+  <data name="IncomingTextSummary" xml:space="preserve"><value>想要发送给你一条文本消息。</value></data>
+  <data name="InvalidIpAddress" xml:space="preserve"><value>请输入有效的 IP 地址。</value></data>
+  <data name="InvalidPort" xml:space="preserve"><value>端口必须在 1 到 65535 之间。</value></data>
+  <data name="IpAddress" xml:space="preserve"><value>IP 地址</value></data>
+  <data name="ItemKindAndSize" xml:space="preserve"><value>{kind} · {size}</value></data>
+  <data name="ItemsAdded" xml:space="preserve"><value>已添加 {count} 项</value></data>
+  <data name="LanguageChinese" xml:space="preserve"><value>简体中文</value></data>
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="MoreItems" xml:space="preserve"><value>另外 {count} 项…</value></data>
+  <data name="Name" xml:space="preserve"><value>名称</value></data>
+  <data name="NavReceive" xml:space="preserve"><value>接收</value></data>
+  <data name="NavSend" xml:space="preserve"><value>发送</value></data>
+  <data name="NavSettings" xml:space="preserve"><value>设置</value></data>
+  <data name="NearbyDevices" xml:space="preserve"><value>附近的设备</value></data>
+  <data name="NetworkStartFailed" xml:space="preserve"><value>无法启动网络服务</value></data>
+  <data name="NodeDisconnected" xml:space="preserve"><value>未连接</value></data>
+  <data name="NodeFaulted" xml:space="preserve"><value>网络服务不可用</value></data>
+  <data name="NodeRunning" xml:space="preserve"><value>已连接到本地网络</value></data>
+  <data name="NodeStarting" xml:space="preserve"><value>正在启动…</value></data>
+  <data name="NodeStopping" xml:space="preserve"><value>正在停止…</value></data>
+  <data name="NothingSelected" xml:space="preserve"><value>尚未选择内容</value></data>
+  <data name="OptionSystem" xml:space="preserve"><value>跟随系统</value></data>
+  <data name="PageNotFound" xml:space="preserve"><value>找不到此页面。</value></data>
+  <data name="PendingRequests" xml:space="preserve"><value>{count} 个待处理请求</value></data>
+  <data name="PickFileFailed" xml:space="preserve"><value>无法选择文件：{error}</value></data>
+  <data name="PickFolderFailed" xml:space="preserve"><value>无法选择文件夹：{error}</value></data>
+  <data name="PinIncorrect" xml:space="preserve"><value>PIN 不正确，请重试。</value></data>
+  <data name="Pin" xml:space="preserve"><value>PIN</value></data>
+  <data name="PinPlaceholder" xml:space="preserve"><value>输入 PIN</value></data>
+  <data name="PinRateLimited" xml:space="preserve"><value>PIN 尝试次数过多，请稍后再试。</value></data>
+  <data name="PinRequiredMessage" xml:space="preserve"><value>{device} 要求输入接收 PIN。</value></data>
+  <data name="PinRequiredTitle" xml:space="preserve"><value>需要 PIN</value></data>
+  <data name="Port" xml:space="preserve"><value>端口</value></data>
+  <data name="PortInUseHint" xml:space="preserve"><value>请检查 53317 端口是否被其他 LocalSend 实例占用。</value></data>
+  <data name="PreparingForDevice" xml:space="preserve"><value>正在准备发送给 {device}…</value></data>
+  <data name="ReceiveCancelled" xml:space="preserve"><value>接收已取消。</value></data>
+  <data name="ReceivedMessage" xml:space="preserve"><value>发送给你了一条消息：</value></data>
+  <data name="ReceivedTextContent" xml:space="preserve"><value>收到的文本内容</value></data>
+  <data name="ReceiveFailed" xml:space="preserve"><value>接收失败。</value></data>
+  <data name="ReceiveTitle" xml:space="preserve"><value>接收</value></data>
+  <data name="ReceivingContent" xml:space="preserve"><value>正在接收内容…</value></data>
+  <data name="ReceivingPreparing" xml:space="preserve"><value>正在准备接收…</value></data>
+  <data name="RefreshDevices" xml:space="preserve"><value>刷新附近设备</value></data>
+  <data name="Remove" xml:space="preserve"><value>移除</value></data>
+  <data name="RemoveItem" xml:space="preserve"><value>移除 {item}</value></data>
+  <data name="Retry" xml:space="preserve"><value>重试</value></data>
+  <data name="SameNetworkHint" xml:space="preserve"><value>请确保目标设备连接到同一个 Wi-Fi 网络。</value></data>
+  <data name="Save" xml:space="preserve"><value>保存</value></data>
+  <data name="SearchingDevices" xml:space="preserve"><value>正在寻找附近设备</value></data>
+  <data name="SelectContentFirst" xml:space="preserve"><value>请先选择要发送的内容。</value></data>
+  <data name="SelectedItems" xml:space="preserve"><value>已选择 {count} 项 · {size}</value></data>
+  <data name="SendCancelled" xml:space="preserve"><value>发送已取消</value></data>
+  <data name="SendFailed" xml:space="preserve"><value>发送失败</value></data>
+  <data name="SendHint" xml:space="preserve"><value>选择内容后，点击附近设备即可发送。</value></data>
+  <data name="SendingPreparing" xml:space="preserve"><value>正在准备发送…</value></data>
+  <data name="SendingTitle" xml:space="preserve"><value>正在发送</value></data>
+  <data name="SendingToDevice" xml:space="preserve"><value>正在发送给 {device}…</value></data>
+  <data name="SendingTransferring" xml:space="preserve"><value>正在传输…</value></data>
+  <data name="SendingWaiting" xml:space="preserve"><value>等待对方响应…</value></data>
+  <data name="SendTextPlaceholder" xml:space="preserve"><value>输入要发送的文本…</value></data>
+  <data name="SendTextTitle" xml:space="preserve"><value>发送文本</value></data>
+  <data name="SendTitle" xml:space="preserve"><value>发送</value></data>
+  <data name="SendToDevice" xml:space="preserve"><value>向 {device} 发送</value></data>
+  <data name="SentToDevice" xml:space="preserve"><value>已成功发送给 {device}。</value></data>
+  <data name="SettingsAnimations" xml:space="preserve"><value>动画效果</value></data>
+  <data name="SettingsAnimationsDescription" xml:space="preserve"><value>启用页面切换和状态过渡动画。</value></data>
+  <data name="SettingsAutoSave" xml:space="preserve"><value>自动保存</value></data>
+  <data name="SettingsAutoSaveDescription" xml:space="preserve"><value>自动接受并保存收到的内容。</value></data>
+  <data name="SettingsDeviceName" xml:space="preserve"><value>设备名称</value></data>
+  <data name="SettingsDeviceNameDescription" xml:space="preserve"><value>其他设备将看到这个名称；更改后需要重启应用。</value></data>
+  <data name="SettingsFavoritesOnly" xml:space="preserve"><value>仅自动接收收藏设备</value></data>
+  <data name="SettingsFavoritesOnlyDescription" xml:space="preserve"><value>自动保存开启时，只信任收藏列表中的设备。</value></data>
+  <data name="SettingsGeneral" xml:space="preserve"><value>通用</value></data>
+  <data name="SettingsLanguage" xml:space="preserve"><value>语言</value></data>
+  <data name="SettingsLanguageDescription" xml:space="preserve"><value>更改界面显示语言。</value></data>
+  <data name="SettingsMinimizeToTray" xml:space="preserve"><value>关闭时最小化到系统托盘</value></data>
+  <data name="SettingsMinimizeToTrayDescription" xml:space="preserve"><value>关闭主窗口时继续在后台接收。</value></data>
+  <data name="SettingsReceive" xml:space="preserve"><value>接收</value></data>
+  <data name="SettingsSaveLocation" xml:space="preserve"><value>保存位置</value></data>
+  <data name="SettingsStartWithWindows" xml:space="preserve"><value>登录系统后自动启动</value></data>
+  <data name="SettingsStartWithWindowsDescription" xml:space="preserve"><value>登录 Windows 后自动运行 LocalSend。</value></data>
+  <data name="SettingsTheme" xml:space="preserve"><value>主题</value></data>
+  <data name="SettingsThemeDescription" xml:space="preserve"><value>选择应用的明暗外观。</value></data>
+  <data name="SettingsTitle" xml:space="preserve"><value>设置</value></data>
+  <data name="Tagline" xml:space="preserve"><value>安全、快速的局域网传输</value></data>
+  <data name="TargetDevice" xml:space="preserve"><value>目标设备</value></data>
+  <data name="TargetRequiresPin" xml:space="preserve"><value>目标设备要求 PIN。</value></data>
+  <data name="Text" xml:space="preserve"><value>文本</value></data>
+  <data name="TextAvailableAfterAccept" xml:space="preserve"><value>接受后将显示完整文本。</value></data>
+  <data name="TextContent" xml:space="preserve"><value>文本内容</value></data>
+  <data name="TextMessage" xml:space="preserve"><value>文本消息</value></data>
+  <data name="TextReceived" xml:space="preserve"><value>文本接收完成。</value></data>
+  <data name="ThemeDark" xml:space="preserve"><value>深色</value></data>
+  <data name="ThemeLight" xml:space="preserve"><value>浅色</value></data>
+  <data name="ThisDevice" xml:space="preserve"><value>本机</value></data>
+  <data name="TransferCancelled" xml:space="preserve"><value>传输已取消。</value></data>
+  <data name="TransferComplete" xml:space="preserve"><value>发送完成</value></data>
+  <data name="TransferFailed" xml:space="preserve"><value>传输失败。</value></data>
+  <data name="TransferPreparing" xml:space="preserve"><value>正在准备</value></data>
+  <data name="TransferTransferring" xml:space="preserve"><value>正在传输</value></data>
+  <data name="TransferWaiting" xml:space="preserve"><value>等待接受</value></data>
+  <data name="WaitingForDevice" xml:space="preserve"><value>正在等待 {device} 接受…</value></data>
+  <data name="WantsToSendMessage" xml:space="preserve"><value>想要发送给你一条消息：</value></data>
+  <data name="WindowUnavailable" xml:space="preserve"><value>当前 Reactor 窗口不可用。</value></data>
+</root>

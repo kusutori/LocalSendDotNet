@@ -1,7 +1,11 @@
 using LocalSendDotNet;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
+using Microsoft.UI.Reactor.Controls.Validation;
 using Microsoft.UI.Reactor.Layout;
+using Microsoft.UI.Reactor.Localization;
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
@@ -9,11 +13,13 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using static Microsoft.UI.Reactor.Factories;
+using static Microsoft.UI.Reactor.Controls.Validation.FormFieldDsl;
 
 sealed record SendPageProps(
     AppRuntimeState Runtime,
     LocalSendNode? Node,
-    Func<Task> RefreshAsync);
+    Func<Task> RefreshAsync,
+    Action<OutgoingTransferViewState?> SetTransferOverlay);
 
 sealed record SelectedSendItem(
     Guid Id,
@@ -28,6 +34,12 @@ sealed record SendRequest(
     string? Pin,
     CancellationToken CancellationToken);
 
+sealed record FavoriteDevice(
+    string Fingerprint,
+    string Name,
+    string Address,
+    int Port);
+
 sealed record TransferUiState(
     TransferState? State,
     string? DeviceName,
@@ -36,29 +48,39 @@ sealed record TransferUiState(
     string Message,
     bool IsError)
 {
-    public static readonly TransferUiState Idle = new(
+    public static TransferUiState Idle(string message) => new(
         State: null,
         DeviceName: null,
         BytesTransferred: 0,
         TotalBytes: 0,
-        Message: "选择内容后，点击附近设备即可发送。",
+        Message: message,
         IsError: false);
 }
 
 sealed class SendPage : Component<SendPageProps>
 {
+    private static readonly IReadOnlyDictionary<string, FavoriteDevice> EmptyFavorites =
+        new Dictionary<string, FavoriteDevice>(StringComparer.Ordinal);
+
     public override Element Render()
     {
+        var t = UseIntl();
         var window = UseWindow();
         var (selectedItems, updateSelectedItems) = UseReducer<IReadOnlyList<SelectedSendItem>>(
             Array.Empty<SelectedSendItem>());
-        var (pickerMessage, setPickerMessage) = UseState("尚未选择内容");
+        var (pickerMessage, setPickerMessage) = UseState(t.Message(new("App", "NothingSelected")));
         var (text, setText) = UseState(string.Empty);
         var (showTextDialog, setShowTextDialog) = UseState(false);
         var (pinTarget, setPinTarget) = UseState<LocalSendDevice?>(null);
         var (pin, setPin) = UseState(string.Empty);
         var (pinError, setPinError) = UseState<string?>(null);
-        var (transfer, updateTransfer) = UseReducer(TransferUiState.Idle);
+        var (favorites, updateFavorites) = UseReducer(EmptyFavorites);
+        var (favoriteTarget, setFavoriteTarget) = UseState<LocalSendDevice?>(null);
+        var (favoriteName, setFavoriteName) = UseState(string.Empty);
+        var (favoriteAddress, setFavoriteAddress) = UseState(string.Empty);
+        var (favoritePort, setFavoritePort) = UseState(string.Empty);
+        var (transfer, updateTransfer) = UseReducer(TransferUiState.Idle(
+            t.Message(new("App", "SendHint"))));
         var sendCancellationRef = UseRef<CancellationTokenSource?>(null);
 
         var sendMutation = UseMutation<SendRequest, TransferResult>(async (request, mutationToken) =>
@@ -67,13 +89,17 @@ sealed class SendPage : Component<SendPageProps>
                 request.CancellationToken,
                 mutationToken);
             var progress = new Progress<TransferProgress>(value =>
-                updateTransfer(_ => new(
+            {
+                var next = new TransferUiState(
                     value.State,
                     request.Device.Alias,
                     value.BytesTransferred,
                     value.TotalBytes,
-                    ProgressMessage(value.State, request.Device.Alias),
-                    IsError: false)));
+                    ProgressMessage(t, value.State, request.Device.Alias),
+                    IsError: false);
+                updateTransfer(_ => next);
+                PublishTransferOverlay(request.Device, request.Items, next, isPending: true);
+            });
 
             return await Props.Node!.SendAsync(
                 request.Device,
@@ -92,13 +118,13 @@ sealed class SendPage : Component<SendPageProps>
                 GridSize.Star(),
             ],
             rows: [GridSize.Auto],
-            SelectionTile("文件", "Document", () => _ = PickFileAsync())
+            SelectionTile(t.Message(new("App", "File")), "Document", () => _ = PickFileAsync(), t)
                 .Grid(column: 0),
-            SelectionTile("文件夹", "Folder", () => _ = PickFolderAsync())
+            SelectionTile(t.Message(new("App", "Folder")), "Folder", () => _ = PickFolderAsync(), t)
                 .Grid(column: 1),
-            SelectionTile("文本", "Edit", () => setShowTextDialog(true))
+            SelectionTile(t.Message(new("App", "Text")), "Edit", () => setShowTextDialog(true), t)
                 .Grid(column: 2),
-            SelectionTile("剪贴板", "Paste", () => _ = AddClipboardAsync())
+            SelectionTile(t.Message(new("App", "Clipboard")), "Paste", () => _ = AddClipboardAsync(), t)
                 .Grid(column: 3)) with
         {
             ColumnSpacing = 12,
@@ -109,13 +135,16 @@ sealed class SendPage : Component<SendPageProps>
             : Card(
                 VStack(8,
                     FlexRow(
-                        BodyStrong($"已选择 {selectedItems.Count} 项 · {FormatBytes(selectedItems.Sum(static item => item.Length))}")
+                        BodyStrong(t.Message(
+                                new("App", "SelectedItems"),
+                                ("count", selectedItems.Count),
+                                ("size", FormatBytes(selectedItems.Sum(static item => item.Length)))))
                             .Flex(grow: 1, basis: 0),
-                        Button("清空", () =>
+                        Button(t.Message(new("App", "Clear")), () =>
                         {
                             updateSelectedItems(_ => Array.Empty<SelectedSendItem>());
-                            setPickerMessage("尚未选择内容");
-                        })) with
+                            setPickerMessage(t.Message(new("App", "NothingSelected")));
+                        }).AutomationName(t.Message(new("App", "Clear")))) with
                     {
                         AlignItems = FlexAlign.Center,
                         ColumnGap = 8,
@@ -125,7 +154,8 @@ sealed class SendPage : Component<SendPageProps>
                             selectedItems.Select(item => SelectedItemRow(
                                 item,
                                 () => updateSelectedItems(current =>
-                                    current.Where(candidate => candidate.Id != item.Id).ToArray()))
+                                    current.Where(candidate => candidate.Id != item.Id).ToArray()),
+                                t)
                                 .WithKey(item.Id.ToString("N")))
                             .ToArray<Element?>()))
                         .MaxHeight(156)
@@ -133,24 +163,34 @@ sealed class SendPage : Component<SendPageProps>
 
         var devices = Props.Runtime.Devices;
         Element deviceContent = devices.Count == 0
-            ? EmptyDevices(Props.Runtime.NodeState)
+            ? EmptyDevices(t, Props.Runtime.NodeState)
             : VStack(8,
                 devices.Select((device, index) =>
                     DeviceCard(
                         device,
-                        isEnabled: selectedItems.Count > 0
-                            && Props.Node?.State == LocalSendNodeState.Running
+                        favorites.GetValueOrDefault(device.Fingerprint),
+                        isEnabled: Props.Node?.State == LocalSendNodeState.Running
                             && !sendMutation.IsPending,
-                        onClick: () => _ = StartSendAsync(device, pin: null))
+                        onClick: () =>
+                        {
+                            if (selectedItems.Count == 0)
+                            {
+                                setPickerMessage(t.Message(new("App", "SelectContentFirst")));
+                                return;
+                            }
+                            _ = StartSendAsync(device, pin: null);
+                        },
+                        onFavorite: () => OpenFavoriteDialog(device),
+                        t)
                         .PositionInSet(index + 1, devices.Count)
                         .WithKey(device.Fingerprint))
                 .ToArray<Element?>());
 
         var page = FlexColumn(
-            Heading("发送")
+            Heading(t.Message(new("App", "SendTitle")))
                 .HeadingLevel(AutomationHeadingLevel.Level1),
             VStack(12,
-                Subtitle("选择内容")
+                Subtitle(t.Message(new("App", "ChooseContent")))
                     .HeadingLevel(AutomationHeadingLevel.Level2),
                 selectionGrid,
                 selectedContent),
@@ -160,15 +200,19 @@ sealed class SendPage : Component<SendPageProps>
                 () =>
                 {
                     sendCancellationRef.Current?.Cancel();
-                    updateTransfer(current => current with { Message = "正在取消传输…" });
-                }),
+                    updateTransfer(current => current with
+                    {
+                        Message = t.Message(new("App", "CancellingTransfer")),
+                    });
+                },
+                t),
             FlexRow(
-                Subtitle("附近的设备")
+                Subtitle(t.Message(new("App", "NearbyDevices")))
                     .HeadingLevel(AutomationHeadingLevel.Level2)
                     .Flex(grow: 1, basis: 0),
                 Button(Icon("Refresh"), () => _ = Props.RefreshAsync())
-                    .AutomationName("刷新附近设备")
-                    .ToolTip("刷新附近设备")
+                    .AutomationName(t.Message(new("App", "RefreshDevices")))
+                    .ToolTip(t.Message(new("App", "RefreshDevices")))
                     .IsEnabled(!sendMutation.IsPending)) with
             {
                 AlignItems = FlexAlign.Center,
@@ -178,30 +222,38 @@ sealed class SendPage : Component<SendPageProps>
                 .HorizontalContentAlignment(HorizontalAlignment.Stretch)
                 .Flex(grow: 1, basis: 0),
             TextDialog(),
-            PinDialog());
+            PinDialog(),
+            FavoriteDialog());
 
         return Border(page)
             .Padding(36)
+            .MaxWidth(1120)
+            .HAlign(HorizontalAlignment.Stretch)
             .Landmark(AutomationLandmarkType.Main);
 
         Element TextDialog() => ContentDialog(
-            "发送文本",
-            TextBox(text, setText, placeholderText: "输入要发送的文本…")
-                .Header("文本内容")
-                .AutomationName("文本内容")
+            t.Message(new("App", "SendTextTitle")),
+            TextBox(text, setText, placeholderText: t.Message(new("App", "SendTextPlaceholder")))
+                .Header(t.Message(new("App", "TextContent")))
+                .AutomationName(t.Message(new("App", "TextContent")))
                 .AcceptsReturn()
                 .TextWrapping(TextWrapping.Wrap)
                 .MinHeight(160),
-            primaryButtonText: "添加") with
+            primaryButtonText: t.Message(new("App", "Add"))) with
         {
             IsOpen = showTextDialog,
-            SecondaryButtonText = "取消",
+            SecondaryButtonText = t.Message(new("App", "Cancel")),
             OnClosed = result =>
             {
                 if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(text))
                 {
                     var item = new SendTextItem(text);
-                    AddSelectedItems([new(Guid.NewGuid(), item, "文本消息", TextLength(text), "文本")]);
+                    AddSelectedItems([new(
+                        Guid.NewGuid(),
+                        item,
+                        t.Message(new("App", "TextMessage")),
+                        TextLength(text),
+                        "text")]);
                     setText(string.Empty);
                 }
                 setShowTextDialog(false);
@@ -209,21 +261,23 @@ sealed class SendPage : Component<SendPageProps>
         };
 
         Element PinDialog() => ContentDialog(
-            "需要 PIN",
+            t.Message(new("App", "PinRequiredTitle")),
             VStack(8,
-                TextBlock($"{pinTarget?.Alias ?? "目标设备"} 要求输入接收 PIN。")
+                TextBlock(t.Message(
+                        new("App", "PinRequiredMessage"),
+                        ("device", pinTarget?.Alias ?? t.Message(new("App", "TargetDevice")))))
                     .TextWrapping(TextWrapping.WrapWholeWords),
-                PasswordBox(pin, setPin, placeholderText: "输入 PIN")
-                    .Header("PIN")
-                    .AutomationName("PIN")
+                PasswordBox(pin, setPin, placeholderText: t.Message(new("App", "PinPlaceholder")))
+                    .Header(t.Message(new("App", "Pin")))
+                    .AutomationName(t.Message(new("App", "Pin")))
                     .MaxLength(32),
                 pinError is null
                     ? null
                     : TextBlock(pinError).Foreground(Theme.SystemCritical)),
-            primaryButtonText: "重试") with
+            primaryButtonText: t.Message(new("App", "Retry"))) with
         {
             IsOpen = pinTarget is not null,
-            SecondaryButtonText = "取消",
+            SecondaryButtonText = t.Message(new("App", "Cancel")),
             OnClosed = result =>
             {
                 var target = pinTarget;
@@ -245,6 +299,93 @@ sealed class SendPage : Component<SendPageProps>
             },
         };
 
+        Element FavoriteDialog()
+        {
+            const string addressPlaceholder = "192.168.1.72";
+            const string portPlaceholder = "53317";
+            var validAddress = IPAddress.TryParse(favoriteAddress, out _);
+            var validPort = int.TryParse(favoritePort, out var parsedPort)
+                && parsedPort is >= 1 and <= ushort.MaxValue;
+            var canSave = favoriteTarget is not null
+                && !string.IsNullOrWhiteSpace(favoriteName)
+                && validAddress
+                && validPort;
+
+            return (ContentDialog(
+                favorites.ContainsKey(favoriteTarget?.Fingerprint ?? string.Empty)
+                    ? t.Message(new("App", "EditFavoriteTitle"))
+                    : t.Message(new("App", "AddFavoriteTitle")),
+                VStack(12,
+                    FormField(
+                        TextBox(favoriteName, setFavoriteName, placeholderText: t.Message(new("App", "DeviceName")))
+                            .AutomationName(t.Message(new("App", "FavoriteDeviceName"))),
+                        label: t.Message(new("App", "Name")),
+                        required: true),
+                    FormField(
+                        TextBox(favoriteAddress, setFavoriteAddress, placeholderText: addressPlaceholder)
+                            .AutomationName(t.Message(new("App", "FavoriteIpAddress"))),
+                        label: t.Message(new("App", "IpAddress")),
+                        required: true,
+                        description: validAddress || string.IsNullOrWhiteSpace(favoriteAddress)
+                            ? null
+                            : t.Message(new("App", "InvalidIpAddress"))),
+                    FormField(
+                        TextBox(favoritePort, setFavoritePort, placeholderText: portPlaceholder)
+                            .NumericInput()
+                            .AutomationName(t.Message(new("App", "FavoritePort"))),
+                        label: t.Message(new("App", "Port")),
+                        required: true,
+                        description: validPort || string.IsNullOrWhiteSpace(favoritePort)
+                            ? null
+                            : t.Message(new("App", "InvalidPort")))),
+                primaryButtonText: t.Message(new("App", "Save"))) with
+            {
+                IsOpen = favoriteTarget is not null,
+                SecondaryButtonText = t.Message(new("App", "Cancel")),
+                DefaultButton = ContentDialogButton.Primary,
+                OnClosed = result =>
+                {
+                    var target = favoriteTarget;
+                    if (result == ContentDialogResult.Primary && target is not null && canSave)
+                    {
+                        var savedFavorite = new FavoriteDevice(
+                            target.Fingerprint,
+                            favoriteName.Trim(),
+                            IPAddress.Parse(favoriteAddress).ToString(),
+                            parsedPort);
+                        updateFavorites(current =>
+                        {
+                            var updated = current.ToDictionary(
+                                static pair => pair.Key,
+                                static pair => pair.Value,
+                                StringComparer.Ordinal);
+                            updated[target.Fingerprint] = savedFavorite;
+                            return updated;
+                        });
+                    }
+                    setFavoriteTarget(null);
+                },
+            }).IsPrimaryButtonEnabled(canSave);
+        }
+
+        void OpenFavoriteDialog(LocalSendDevice device)
+        {
+            if (favorites.TryGetValue(device.Fingerprint, out var favorite))
+            {
+                setFavoriteName(favorite.Name);
+                setFavoriteAddress(favorite.Address);
+                setFavoritePort(favorite.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                var endpoint = device.PreferredEndpoint;
+                setFavoriteName(device.Alias);
+                setFavoriteAddress(endpoint?.Address.ToString() ?? string.Empty);
+                setFavoritePort(endpoint?.Port.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "53317");
+            }
+            setFavoriteTarget(device);
+        }
+
         async Task PickFileAsync()
         {
             try
@@ -252,7 +393,7 @@ sealed class SendPage : Component<SendPageProps>
                 var picker = new FileOpenPicker
                 {
                     SuggestedStartLocation = PickerLocationId.Downloads,
-                    CommitButtonText = "添加",
+                    CommitButtonText = t.Message(new("App", "Add")),
                 };
                 picker.FileTypeFilter.Add("*");
                 InitializePicker(picker);
@@ -267,7 +408,9 @@ sealed class SendPage : Component<SendPageProps>
             }
             catch (Exception exception)
             {
-                setPickerMessage($"无法选择文件：{exception.Message}");
+                setPickerMessage(t.Message(
+                    new("App", "PickFileFailed"),
+                    ("error", exception.Message)));
             }
         }
 
@@ -278,7 +421,7 @@ sealed class SendPage : Component<SendPageProps>
                 var picker = new FolderPicker
                 {
                     SuggestedStartLocation = PickerLocationId.Downloads,
-                    CommitButtonText = "添加文件夹",
+                    CommitButtonText = t.Message(new("App", "AddFolder")),
                 };
                 picker.FileTypeFilter.Add("*");
                 InitializePicker(picker);
@@ -289,21 +432,23 @@ sealed class SendPage : Component<SendPageProps>
                 var selected = await FromFolderAsync(folder, CancellationToken.None);
                 if (selected.Count == 0)
                 {
-                    setPickerMessage("所选文件夹中没有可发送的文件。");
+                    setPickerMessage(t.Message(new("App", "FolderEmpty")));
                     return;
                 }
                 AddSelectedItems(selected);
             }
             catch (Exception exception)
             {
-                setPickerMessage($"无法选择文件夹：{exception.Message}");
+                setPickerMessage(t.Message(
+                    new("App", "PickFolderFailed"),
+                    ("error", exception.Message)));
             }
         }
 
         void InitializePicker(object picker)
         {
             var nativeWindow = window?.NativeWindow
-                ?? throw new InvalidOperationException("当前 Reactor 窗口不可用。");
+                ?? throw new InvalidOperationException(t.Message(new("App", "WindowUnavailable")));
             var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(nativeWindow);
             WinRT.Interop.InitializeWithWindow.Initialize(picker, windowHandle);
         }
@@ -345,32 +490,38 @@ sealed class SendPage : Component<SendPageProps>
                         AddSelectedItems([new(
                             Guid.NewGuid(),
                             item,
-                            "剪贴板文本",
+                            t.Message(new("App", "ClipboardText")),
                             TextLength(clipboardText),
-                            "剪贴板")]);
+                            "clipboard")]);
                         return;
                     }
                 }
 
                 if (data.Contains(StandardDataFormats.Bitmap))
                 {
-                    AddSelectedItems([await FromClipboardBitmapAsync(data, CancellationToken.None)]);
+                    var bitmap = await FromClipboardBitmapAsync(data, CancellationToken.None);
+                    AddSelectedItems([bitmap with
+                    {
+                        DisplayName = t.Message(new("App", "ClipboardImage")),
+                    }]);
                     return;
                 }
 
-                setPickerMessage("剪贴板中没有可发送的文本、文件或文件夹。");
+                setPickerMessage(t.Message(new("App", "ClipboardEmpty")));
             }
             catch (Exception exception)
             {
-                setPickerMessage($"无法读取剪贴板：{exception.Message}");
+                setPickerMessage(t.Message(
+                    new("App", "ClipboardReadFailed"),
+                    ("error", exception.Message)));
             }
         }
 
         void AddSelectedItems(IReadOnlyCollection<SelectedSendItem> newItems)
         {
             updateSelectedItems(current => [.. current, .. newItems]);
-            setPickerMessage($"已添加 {newItems.Count} 项");
-            updateTransfer(_ => TransferUiState.Idle);
+            setPickerMessage(t.Message(new("App", "ItemsAdded"), ("count", newItems.Count)));
+            updateTransfer(_ => TransferUiState.Idle(t.Message(new("App", "SendHint"))));
         }
 
         async Task StartSendAsync(LocalSendDevice device, string? pin)
@@ -386,8 +537,19 @@ sealed class SendPage : Component<SendPageProps>
                 device.Alias,
                 0,
                 selectedItems.Sum(static item => item.Length),
-                $"正在准备发送给 {device.Alias}…",
+                t.Message(new("App", "PreparingForDevice"), ("device", device.Alias)),
                 IsError: false));
+            PublishTransferOverlay(
+                device,
+                selectedItems.Select(static item => item.Item).ToArray(),
+                new(
+                    TransferState.Preparing,
+                    device.Alias,
+                    0,
+                    selectedItems.Sum(static item => item.Length),
+                    t.Message(new("App", "PreparingForDevice"), ("device", device.Alias)),
+                    IsError: false),
+                isPending: true);
 
             try
             {
@@ -396,44 +558,58 @@ sealed class SendPage : Component<SendPageProps>
                     selectedItems.Select(static item => item.Item).ToArray(),
                     pin,
                     cancellation.Token));
-                updateTransfer(_ => ResultState(
+                var resultState = ResultState(
+                    t,
                     result,
                     device.Alias,
-                    selectedItems.Sum(static item => item.Length)));
+                    selectedItems.Sum(static item => item.Length));
+                updateTransfer(_ => resultState);
+                PublishTransferOverlay(
+                    device,
+                    selectedItems.Select(static item => item.Item).ToArray(),
+                    resultState,
+                    isPending: false);
                 if (result.IsSuccess)
                 {
                     updateSelectedItems(_ => Array.Empty<SelectedSendItem>());
-                    setPickerMessage("尚未选择内容");
+                    setPickerMessage(t.Message(new("App", "NothingSelected")));
                 }
             }
             catch (PinRequiredException exception)
             {
-                setPinError(exception.InvalidPin ? "PIN 不正确，请重试。" : null);
+                Props.SetTransferOverlay(null);
+                setPinError(exception.InvalidPin ? t.Message(new("App", "PinIncorrect")) : null);
                 setPinTarget(device);
                 updateTransfer(current => current with
                 {
                     State = TransferState.WaitingForAcceptance,
-                    Message = "目标设备要求 PIN。",
+                    Message = t.Message(new("App", "TargetRequiresPin")),
                     IsError = exception.InvalidPin,
                 });
             }
             catch (PinRateLimitedException)
             {
-                updateTransfer(current => current with
-                {
-                    State = TransferState.Failed,
-                    Message = "PIN 尝试次数过多，请稍后再试。",
-                    IsError = true,
-                });
+                var errorState = new TransferUiState(
+                    TransferState.Failed,
+                    device.Alias,
+                    0,
+                    selectedItems.Sum(static item => item.Length),
+                    t.Message(new("App", "PinRateLimited")),
+                    IsError: true);
+                updateTransfer(_ => errorState);
+                PublishTransferOverlay(device, selectedItems.Select(static item => item.Item).ToArray(), errorState, false);
             }
             catch (Exception exception)
             {
-                updateTransfer(current => current with
-                {
-                    State = TransferState.Failed,
-                    Message = exception.Message,
-                    IsError = true,
-                });
+                var errorState = new TransferUiState(
+                    TransferState.Failed,
+                    device.Alias,
+                    0,
+                    selectedItems.Sum(static item => item.Length),
+                    exception.Message,
+                    IsError: true);
+                updateTransfer(_ => errorState);
+                PublishTransferOverlay(device, selectedItems.Select(static item => item.Item).ToArray(), errorState, false);
             }
             finally
             {
@@ -442,9 +618,44 @@ sealed class SendPage : Component<SendPageProps>
                 cancellation.Dispose();
             }
         }
+
+        void PublishTransferOverlay(
+            LocalSendDevice device,
+            IReadOnlyList<SendItem> items,
+            TransferUiState state,
+            bool isPending)
+        {
+            Props.SetTransferOverlay(new(
+                Props.Runtime.Identity,
+                device,
+                ContentSummary(t, items),
+                state.State ?? TransferState.Preparing,
+                state.BytesTransferred,
+                state.TotalBytes,
+                state.Message,
+                isPending,
+                state.IsError,
+                () =>
+                {
+                    sendCancellationRef.Current?.Cancel();
+                    updateTransfer(current => current with
+                    {
+                        Message = t.Message(new("App", "CancellingTransfer")),
+                    });
+                }));
+        }
     }
 
-    private static Element SelectionTile(string label, string icon, Action onClick) =>
+    private static string ContentSummary(IntlAccessor t, IReadOnlyList<SendItem> items)
+    {
+        if (items.Count == 1 && items[0] is SendTextItem)
+            return t.Message(new("App", "ContentOneTextMessage"));
+        if (items.Count == 1)
+            return t.Message(new("App", "ContentOneFile"), ("file", items[0].FileName));
+        return t.Message(new("App", "ContentManyItems"), ("count", items.Count));
+    }
+
+    private static Element SelectionTile(string label, string icon, Action onClick, IntlAccessor t) =>
         Button(
             VStack(8,
                 Icon(icon).AccessibilityHidden(),
@@ -452,9 +663,9 @@ sealed class SendPage : Component<SendPageProps>
             onClick)
         .MinHeight(104)
         .HAlign(HorizontalAlignment.Stretch)
-        .AutomationName($"选择{label}");
+        .AutomationName(t.Message(new("App", "ChooseItem"), ("item", label)));
 
-    private static Element SelectedItemRow(SelectedSendItem item, Action remove) =>
+    private static Element SelectedItemRow(SelectedSendItem item, Action remove, IntlAccessor t) =>
         Grid(
             columns: [GridSize.Auto, GridSize.Star(), GridSize.Auto],
             rows: [GridSize.Auto],
@@ -465,42 +676,99 @@ sealed class SendPage : Component<SendPageProps>
                 TextBlock(item.DisplayName)
                     .TextTrimming(TextTrimming.CharacterEllipsis)
                     .ToolTip(item.DisplayName),
-                Caption($"{item.Kind} · {FormatBytes(item.Length)}")
+                Caption(t.Message(
+                        new("App", "ItemKindAndSize"),
+                        ("kind", ItemKindLabel(t, item.Kind)),
+                        ("size", FormatBytes(item.Length))))
                     .Foreground(Theme.SecondaryText))
                 .Margin(horizontal: 12, vertical: 0)
                 .Grid(column: 1),
             Button(Icon("Delete"), remove)
-                .AutomationName($"移除 {item.DisplayName}")
-                .ToolTip("移除")
+                .AutomationName(t.Message(new("App", "RemoveItem"), ("item", item.DisplayName)))
+                .ToolTip(t.Message(new("App", "Remove")))
                 .Grid(column: 2))
         .Padding(8);
 
-    private static Element DeviceCard(LocalSendDevice device, bool isEnabled, Action onClick) =>
-        Button(
-            Grid(
-                columns: [GridSize.Auto, GridSize.Star(), GridSize.Auto],
-                rows: [GridSize.Auto],
-                Border(Icon(DeviceIcon(device.DeviceType)).AccessibilityHidden())
-                    .Size(56, 56)
-                    .CornerRadius(28)
-                    .Background(Theme.SubtleFill)
-                    .Grid(column: 0),
-                VStack(4,
-                    BodyLarge(device.Alias),
-                    Caption(DeviceDescription(device)).Foreground(Theme.SecondaryText))
-                    .Margin(horizontal: 16, vertical: 0)
-                    .VAlign(VerticalAlignment.Center)
-                    .Grid(column: 1),
-                Icon("Forward").AccessibilityHidden()
-                    .VAlign(VerticalAlignment.Center)
-                    .Grid(column: 2)),
-            onClick)
-        .MinHeight(88)
-        .HAlign(HorizontalAlignment.Stretch)
-        .AutomationName($"向 {device.Alias} 发送")
-        .IsEnabled(isEnabled);
+    private static Element DeviceCard(
+        LocalSendDevice device,
+        FavoriteDevice? favorite,
+        bool isEnabled,
+        Action onClick,
+        Action onFavorite,
+        IntlAccessor t)
+    {
+        var displayName = favorite?.Name ?? device.Alias;
+        var model = string.IsNullOrWhiteSpace(device.DeviceModel)
+            ? DeviceTypeLabel(t, device.DeviceType)
+            : device.DeviceModel;
 
-    private static Element TransferPanel(TransferUiState transfer, bool isPending, Action cancel)
+        return Grid(
+            columns: [GridSize.Star(), GridSize.Auto],
+            rows: [GridSize.Auto],
+            Button(
+                Grid(
+                    columns: [GridSize.Auto, GridSize.Star()],
+                    rows: [GridSize.Auto],
+                    Border(Icon(DeviceIcon(device.DeviceType)).AccessibilityHidden())
+                        .Size(56, 56)
+                        .CornerRadius(28)
+                        .Background(Theme.SubtleFill)
+                        .Grid(column: 0),
+                    VStack(8,
+                        BodyLarge(displayName)
+                            .TextTrimming(TextTrimming.CharacterEllipsis)
+                            .ToolTip(displayName),
+                        HStack(8,
+                            DeviceTag(DeviceNumber(device)),
+                            DeviceTag(model!)))
+                        .Margin(horizontal: 16, vertical: 0)
+                        .VAlign(VerticalAlignment.Center)
+                        .Grid(column: 1)),
+                onClick)
+                .MinHeight(96)
+                .HAlign(HorizontalAlignment.Stretch)
+                .HorizontalContentAlignment(HorizontalAlignment.Stretch)
+                .AutomationName(t.Message(new("App", "SendToDevice"), ("device", displayName)))
+                .IsEnabled(isEnabled)
+                .Resources(static resources => resources
+                    .Set("ButtonBackground", Theme.Ref("SubtleFillColorTransparentBrush"))
+                    .Set("ButtonBackgroundPointerOver", Theme.Ref("SubtleFillColorSecondaryBrush"))
+                    .Set("ButtonBackgroundPressed", Theme.Ref("SubtleFillColorTertiaryBrush"))
+                    .Set("ButtonBorderBrush", Theme.Ref("SubtleFillColorTransparentBrush")))
+                .Grid(column: 0),
+            Button(Icon(favorite is null ? "\uEB51" : "\uEB52"), onFavorite)
+                .AutomationName(favorite is null
+                    ? t.Message(new("App", "FavoriteDevice"), ("device", displayName))
+                    : t.Message(new("App", "EditFavoriteDevice"), ("device", displayName)))
+                .ToolTip(favorite is null
+                    ? t.Message(new("App", "AddFavoriteTitle"))
+                    : t.Message(new("App", "EditFavorite")))
+                .MinWidth(64)
+                .MinHeight(64)
+                .VAlign(VerticalAlignment.Center)
+                .Resources(static resources => resources
+                    .Set("ButtonBackground", Theme.Ref("SubtleFillColorTransparentBrush"))
+                    .Set("ButtonBackgroundPointerOver", Theme.Ref("SubtleFillColorSecondaryBrush"))
+                    .Set("ButtonBackgroundPressed", Theme.Ref("SubtleFillColorTertiaryBrush"))
+                    .Set("ButtonBorderBrush", Theme.Ref("SubtleFillColorTransparentBrush")))
+                .Grid(column: 1))
+            .MinHeight(96)
+            .CornerRadius(8)
+            .Background(Theme.CardBackground)
+            .WithBorder(Theme.CardStroke, 1);
+    }
+
+    private static Element DeviceTag(string text) =>
+        Border(Caption(text))
+            .Padding(horizontal: 8, vertical: 4)
+            .CornerRadius(4)
+            .Background(Theme.SubtleFill);
+
+    private static Element TransferPanel(
+        TransferUiState transfer,
+        bool isPending,
+        Action cancel,
+        IntlAccessor t)
     {
         if (transfer.State is null)
             return Caption(transfer.Message).Foreground(Theme.SecondaryText);
@@ -508,17 +776,18 @@ sealed class SendPage : Component<SendPageProps>
         var progress = transfer.TotalBytes <= 0
             ? 0
             : Math.Clamp(transfer.BytesTransferred * 100d / transfer.TotalBytes, 0, 100);
+        var progressText = $"{FormatBytes(transfer.BytesTransferred)} / {FormatBytes(transfer.TotalBytes)}";
         return Card(
             VStack(12,
                 FlexRow(
                     VStack(4,
-                        BodyStrong(TransferTitle(transfer.State.Value)),
+                        BodyStrong(TransferTitle(t, transfer.State.Value)),
                         TextBlock(transfer.Message)
                             .Foreground(transfer.IsError ? Theme.SystemCritical : Theme.SecondaryText))
                         .Flex(grow: 1, basis: 0),
                     isPending
-                        ? Button("取消", cancel)
-                            .AutomationName("取消当前传输")
+                        ? Button(t.Message(new("App", "Cancel")), cancel)
+                            .AutomationName(t.Message(new("App", "CancelCurrentTransfer")))
                         : null) with
                 {
                     AlignItems = FlexAlign.Center,
@@ -527,17 +796,19 @@ sealed class SendPage : Component<SendPageProps>
                 transfer.State is TransferState.Preparing or TransferState.WaitingForAcceptance
                     ? ProgressIndeterminate()
                     : Progress(progress),
-                Caption($"{FormatBytes(transfer.BytesTransferred)} / {FormatBytes(transfer.TotalBytes)}")
+                Caption(progressText)
                     .Foreground(Theme.SecondaryText)));
     }
 
-    private static Element EmptyDevices(LocalSendNodeState state) =>
+    private static Element EmptyDevices(IntlAccessor t, LocalSendNodeState state) =>
         FlexColumn(
             Icon(state == LocalSendNodeState.Faulted ? "Important" : "Find").AccessibilityHidden(),
-            Subtitle(state == LocalSendNodeState.Faulted ? "无法启动网络服务" : "正在寻找附近设备"),
+            Subtitle(state == LocalSendNodeState.Faulted
+                ? t.Message(new("App", "NetworkStartFailed"))
+                : t.Message(new("App", "SearchingDevices"))),
             TextBlock(state == LocalSendNodeState.Faulted
-                    ? "请检查 53317 端口是否被其他 LocalSend 实例占用。"
-                    : "请确保目标设备连接到同一个 Wi-Fi 网络。")
+                    ? t.Message(new("App", "PortInUseHint"))
+                    : t.Message(new("App", "SameNetworkHint")))
                 .Foreground(Theme.SecondaryText)
                 .TextWrapping(TextWrapping.WrapWholeWords)) with
         {
@@ -560,7 +831,7 @@ sealed class SendPage : Component<SendPageProps>
                 token.ThrowIfCancellationRequested();
                 return await file.OpenStreamForReadAsync().ConfigureAwait(false);
             });
-        return new(Guid.NewGuid(), item, protocolName, checked((long)properties.Size), "文件");
+        return new(Guid.NewGuid(), item, protocolName, checked((long)properties.Size), "file");
     }
 
     private static Task<IReadOnlyList<SelectedSendItem>> FromFolderAsync(
@@ -569,7 +840,7 @@ sealed class SendPage : Component<SendPageProps>
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(folder.Path))
-                throw new IOException("所选文件夹没有可访问的本地路径。");
+                throw new IOException("The selected folder has no accessible local path.");
 
             return Directory.EnumerateFiles(folder.Path, "*", SearchOption.AllDirectories)
                 .Select(path =>
@@ -582,7 +853,7 @@ sealed class SendPage : Component<SendPageProps>
                         new SendFileItem(path, protocolName),
                         protocolName,
                         new FileInfo(path).Length,
-                        "文件夹");
+                        "folder");
                 })
                 .ToArray();
         }, cancellationToken);
@@ -612,10 +883,11 @@ sealed class SendPage : Component<SendPageProps>
                 return stream.AsStreamForRead();
             },
             contentType);
-        return new(Guid.NewGuid(), item, "剪贴板图片", length, "剪贴板");
+        return new(Guid.NewGuid(), item, fileName, length, "clipboard");
     }
 
     private static TransferUiState ResultState(
+        IntlAccessor t,
         TransferResult result,
         string deviceAlias,
         long requestedBytes) => result.State switch
@@ -625,42 +897,42 @@ sealed class SendPage : Component<SendPageProps>
                 deviceAlias,
                 result.BytesTransferred,
                 result.BytesTransferred,
-                $"已成功发送给 {deviceAlias}。",
+                t.Message(new("App", "SentToDevice"), ("device", deviceAlias)),
                 IsError: false),
             TransferState.Cancelled => new(
                 result.State,
                 deviceAlias,
                 result.BytesTransferred,
                 requestedBytes,
-                "传输已取消。",
+                t.Message(new("App", "TransferCancelled")),
                 IsError: false),
             _ => new(
                 result.State,
                 deviceAlias,
                 result.BytesTransferred,
                 requestedBytes,
-                result.Failure?.Message ?? "传输失败。",
+                result.Failure?.Message ?? t.Message(new("App", "TransferFailed")),
                 IsError: true),
         };
 
-    private static string ProgressMessage(TransferState state, string deviceAlias) => state switch
+    private static string ProgressMessage(IntlAccessor t, TransferState state, string deviceAlias) => state switch
     {
-        TransferState.Preparing => $"正在准备发送给 {deviceAlias}…",
-        TransferState.WaitingForAcceptance => $"正在等待 {deviceAlias} 接受…",
-        TransferState.Transferring => $"正在发送给 {deviceAlias}…",
-        TransferState.Completed => $"已成功发送给 {deviceAlias}。",
-        TransferState.Cancelled => "传输已取消。",
-        _ => "传输失败。",
+        TransferState.Preparing => t.Message(new("App", "PreparingForDevice"), ("device", deviceAlias)),
+        TransferState.WaitingForAcceptance => t.Message(new("App", "WaitingForDevice"), ("device", deviceAlias)),
+        TransferState.Transferring => t.Message(new("App", "SendingToDevice"), ("device", deviceAlias)),
+        TransferState.Completed => t.Message(new("App", "SentToDevice"), ("device", deviceAlias)),
+        TransferState.Cancelled => t.Message(new("App", "TransferCancelled")),
+        _ => t.Message(new("App", "TransferFailed")),
     };
 
-    private static string TransferTitle(TransferState state) => state switch
+    private static string TransferTitle(IntlAccessor t, TransferState state) => state switch
     {
-        TransferState.Preparing => "正在准备",
-        TransferState.WaitingForAcceptance => "等待接受",
-        TransferState.Transferring => "正在传输",
-        TransferState.Completed => "发送完成",
-        TransferState.Cancelled => "已取消",
-        _ => "发送失败",
+        TransferState.Preparing => t.Message(new("App", "TransferPreparing")),
+        TransferState.WaitingForAcceptance => t.Message(new("App", "TransferWaiting")),
+        TransferState.Transferring => t.Message(new("App", "TransferTransferring")),
+        TransferState.Completed => t.Message(new("App", "TransferComplete")),
+        TransferState.Cancelled => t.Message(new("App", "Cancelled")),
+        _ => t.Message(new("App", "SendFailed")),
     };
 
     private static string DeviceIcon(LocalSendDeviceType type) => type switch
@@ -671,19 +943,42 @@ sealed class SendPage : Component<SendPageProps>
         _ => "Remote",
     };
 
+    private static string DeviceTypeLabel(IntlAccessor t, LocalSendDeviceType type) => type switch
+    {
+        LocalSendDeviceType.Mobile => t.Message(new("App", "DeviceMobile")),
+        LocalSendDeviceType.Web => t.Message(new("App", "DeviceWeb")),
+        LocalSendDeviceType.Headless => t.Message(new("App", "DeviceHeadless")),
+        LocalSendDeviceType.Server => t.Message(new("App", "DeviceServer")),
+        _ => t.Message(new("App", "DeviceDesktop")),
+    };
+
+    private static string DeviceNumber(LocalSendDevice device)
+    {
+        var address = device.PreferredEndpoint?.Address;
+        if (address is null)
+            return "#—";
+        if (address.IsIPv4MappedToIPv6)
+            address = address.MapToIPv4();
+        return address.AddressFamily == AddressFamily.InterNetwork
+            ? $"#{address.GetAddressBytes()[^1]}"
+            : "#—";
+    }
+
     private static string ItemIcon(string kind) => kind switch
     {
-        "文本" => "Edit",
-        "剪贴板" => "Paste",
-        "文件夹" => "Folder",
+        "text" => "Edit",
+        "clipboard" => "Paste",
+        "folder" => "Folder",
         _ => "Document",
     };
 
-    private static string DeviceDescription(LocalSendDevice device)
+    private static string ItemKindLabel(IntlAccessor t, string kind) => kind switch
     {
-        var model = string.IsNullOrWhiteSpace(device.DeviceModel) ? "未知设备" : device.DeviceModel;
-        return $"{model}  ·  v{device.ProtocolVersion}";
-    }
+        "text" => t.Message(new("App", "Text")),
+        "clipboard" => t.Message(new("App", "Clipboard")),
+        "folder" => t.Message(new("App", "Folder")),
+        _ => t.Message(new("App", "File")),
+    };
 
     private static long TextLength(string value) => System.Text.Encoding.UTF8.GetByteCount(value);
 

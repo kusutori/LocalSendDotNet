@@ -22,6 +22,8 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" Condition="'$(CI)' == 'true'" />
     <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../../NOTICE" Pack="true" PackagePath="/" />
     <None Include="../../docs/core-api.md" Pack="true" PackagePath="docs/" />
     <None Include="../../docs/compatibility.md" Pack="true" PackagePath="docs/" />
     <None Include="../../docs/interop-matrix.md" Pack="true" PackagePath="docs/" />

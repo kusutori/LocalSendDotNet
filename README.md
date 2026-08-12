@@ -69,4 +69,6 @@ The library requires the .NET 10 and ASP.NET Core 10 shared frameworks for frame
 
 ## License
 
-Apache-2.0. LocalSend is a separate Apache-2.0 project; this repository is an independent protocol implementation.
+LocalSendDotNet is licensed under [Apache-2.0](LICENSE). Attribution and the
+relationship to the separate official LocalSend project are documented in
+[NOTICE](NOTICE).

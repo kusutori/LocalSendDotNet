@@ -1,0 +1,11 @@
+LocalSendDotNet
+Copyright 2026 kusutori and LocalSendDotNet contributors.
+
+LocalSendDotNet is an independent implementation of the LocalSend protocol.
+
+LocalSend is a separate project created by Tien Do Nam and contributors and is
+licensed under the Apache License, Version 2.0.
+
+LocalSendDotNet is not affiliated with or endorsed by the official LocalSend
+project. References to LocalSend are used for protocol compatibility and
+identification purposes.

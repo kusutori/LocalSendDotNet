@@ -65,3 +65,14 @@ sealed record OutgoingTransferViewState(
     bool IsPending,
     bool IsError,
     Action Cancel);
+
+sealed record ShareTargetPayload(
+    Guid Id,
+    IReadOnlyList<ShareTargetItem> Items);
+
+abstract record ShareTargetItem
+{
+    public sealed record FileSystem(string Path, bool IsDirectory) : ShareTargetItem;
+
+    public sealed record Text(string Value, string FileName) : ShareTargetItem;
+}

@@ -58,6 +58,18 @@ Keep the PFX and its password outside the repository. The manifest declares both
 `internetClientServer` and `privateNetworkClientServer`, which the LocalSend HTTP
 server and local-network discovery require, plus `runFullTrust` for the desktop app.
 
+For local sideload testing, generate a compatible code-signing certificate with:
+
+```powershell
+.\tools\New-MsixSigningCertificate.ps1
+```
+
+The generated certificate contains the Basic Constraints extension required by
+Visual Studio's `Add-AppDevPackage.ps1`, with `CA=false`, plus the Code Signing EKU
+and Digital Signature key usage. Copy the generated `.cer` beside the `.msix` only
+when using the generated installation script. The package must be signed with the
+matching private key from `Cert:\CurrentUser\My` (or an exported PFX).
+
 ## Native AOT inside MSIX
 
 Native AOT and MSIX are independent choices. This command publishes an unsigned

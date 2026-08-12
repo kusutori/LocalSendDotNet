@@ -19,7 +19,9 @@ sealed record SendPageProps(
     AppRuntimeState Runtime,
     LocalSendNode? Node,
     Func<Task> RefreshAsync,
-    Action<OutgoingTransferViewState?> SetTransferOverlay);
+    Action<OutgoingTransferViewState?> SetTransferOverlay,
+    ShareTargetPayload? ShareTargetPayload,
+    Action<Guid> ConsumeShareTargetPayload);
 
 sealed record SelectedSendItem(
     Guid Id,
@@ -82,6 +84,21 @@ sealed class SendPage : Component<SendPageProps>
         var (transfer, updateTransfer) = UseReducer(TransferUiState.Idle(
             t.Message(new("App", "SendHint"))));
         var sendCancellationRef = UseRef<CancellationTokenSource?>(null);
+        var shareTargetPayloadId = Props.ShareTargetPayload?.Id ?? Guid.Empty;
+
+        UseEffect(() =>
+        {
+            if (Props.ShareTargetPayload is not { } payload)
+                return static () => { };
+
+            var cancellation = new CancellationTokenSource();
+            _ = ImportShareTargetPayloadAsync(payload, cancellation.Token);
+            return () =>
+            {
+                cancellation.Cancel();
+                cancellation.Dispose();
+            };
+        }, shareTargetPayloadId);
 
         var sendMutation = UseMutation<SendRequest, TransferResult>(async (request, mutationToken) =>
         {
@@ -524,6 +541,65 @@ sealed class SendPage : Component<SendPageProps>
             updateTransfer(_ => TransferUiState.Idle(t.Message(new("App", "SendHint"))));
         }
 
+        async Task ImportShareTargetPayloadAsync(
+            ShareTargetPayload payload,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var imported = new List<SelectedSendItem>();
+                foreach (var sharedItem in payload.Items)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    switch (sharedItem)
+                    {
+                        case ShareTargetItem.FileSystem { IsDirectory: true } directory:
+                            imported.AddRange(await FromFolderPathAsync(
+                                directory.Path,
+                                cancellationToken));
+                            break;
+
+                        case ShareTargetItem.FileSystem file:
+                            var fileInfo = new FileInfo(file.Path);
+                            if (!fileInfo.Exists)
+                                throw new FileNotFoundException("The shared file is no longer available.", file.Path);
+                            imported.Add(new SelectedSendItem(
+                                Guid.NewGuid(),
+                                new SendFileItem(fileInfo.FullName, fileInfo.Name),
+                                fileInfo.Name,
+                                fileInfo.Length,
+                                "file"));
+                            break;
+
+                        case ShareTargetItem.Text sharedText:
+                            imported.Add(new SelectedSendItem(
+                                Guid.NewGuid(),
+                                new SendTextItem(sharedText.Value, sharedText.FileName),
+                                sharedText.FileName,
+                                TextLength(sharedText.Value),
+                                "text"));
+                            break;
+                    }
+                }
+
+                if (imported.Count == 0)
+                    throw new InvalidDataException(t.Message(new("App", "ShareTargetEmpty")));
+
+                AddSelectedItems(imported);
+                Props.ConsumeShareTargetPayload(payload.Id);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                setPickerMessage(t.Message(
+                    new("App", "ShareTargetFailed"),
+                    ("error", exception.Message)));
+                Props.ConsumeShareTargetPayload(payload.Id);
+            }
+        }
+
         async Task StartSendAsync(LocalSendDevice device, string? pin)
         {
             if (Props.Node?.State != LocalSendNodeState.Running || selectedItems.Count == 0)
@@ -836,17 +912,25 @@ sealed class SendPage : Component<SendPageProps>
 
     private static Task<IReadOnlyList<SelectedSendItem>> FromFolderAsync(
         StorageFolder folder,
+        CancellationToken cancellationToken) => FromFolderPathAsync(folder.Path, cancellationToken);
+
+    private static Task<IReadOnlyList<SelectedSendItem>> FromFolderPathAsync(
+        string folderPath,
         CancellationToken cancellationToken) => Task.Run<IReadOnlyList<SelectedSendItem>>(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(folder.Path))
+            if (string.IsNullOrWhiteSpace(folderPath))
                 throw new IOException("The selected folder has no accessible local path.");
 
-            return Directory.EnumerateFiles(folder.Path, "*", SearchOption.AllDirectories)
+            var folder = new DirectoryInfo(folderPath);
+            if (!folder.Exists)
+                throw new DirectoryNotFoundException($"The shared folder is no longer available: {folderPath}");
+
+            return Directory.EnumerateFiles(folder.FullName, "*", SearchOption.AllDirectories)
                 .Select(path =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var relativeName = Path.GetRelativePath(folder.Path, path).Replace('\\', '/');
+                    var relativeName = Path.GetRelativePath(folder.FullName, path).Replace('\\', '/');
                     var protocolName = $"{folder.Name}/{relativeName}";
                     return new SelectedSendItem(
                         Guid.NewGuid(),

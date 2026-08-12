@@ -141,6 +141,8 @@
   <data name="SettingsTheme" xml:space="preserve"><value>Theme</value></data>
   <data name="SettingsThemeDescription" xml:space="preserve"><value>Choose the app''s light or dark appearance.</value></data>
   <data name="SettingsTitle" xml:space="preserve"><value>Settings</value></data>
+  <data name="ShareTargetEmpty" xml:space="preserve"><value>The share did not contain any accessible files or text.</value></data>
+  <data name="ShareTargetFailed" xml:space="preserve"><value>Could not add the shared content: {error}</value></data>
   <data name="Tagline" xml:space="preserve"><value>Secure, fast local network transfers</value></data>
   <data name="TargetDevice" xml:space="preserve"><value>Target device</value></data>
   <data name="TargetRequiresPin" xml:space="preserve"><value>The target device requires a PIN.</value></data>

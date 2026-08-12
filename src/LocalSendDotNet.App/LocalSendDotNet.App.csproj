@@ -34,8 +34,8 @@
             to install the runtime first.
         -->
         <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-        <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-        <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+        <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+        <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
         <Nullable>enable</Nullable>
         <ReactorLocDefaultLocale>en-US</ReactorLocDefaultLocale>
         <ReactorLocStringsPath>Strings\</ReactorLocStringsPath>

@@ -5,8 +5,12 @@ using Microsoft.UI.Reactor.Localization;
 using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Windows.AppLifecycle;
 using static Microsoft.UI.Reactor.Factories;
+using Windows.ApplicationModel.Activation;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.System.UserProfile;
+using Windows.Storage;
 
 sealed class AppShell : Component
 {
@@ -27,7 +31,8 @@ sealed class AppShell : Component
             locale,
             Component<LocalizedAppShell, LocalizedAppShellProps>(new(settings, updateSettings)),
             Resources,
-            defaultLocale: "en-US");
+            defaultLocale: "en-US")
+            .Backdrop(BackdropKind.Mica);
     }
 
     private static string SystemLocale() => GlobalizationPreferences.Languages.Any(
@@ -45,12 +50,23 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
     public override Element Render()
     {
         var t = UseIntl();
+        var window = UseWindow();
         var settings = Props.Settings;
         var updateSettings = Props.UpdateSettings;
         var navigation = UseNavigation(AppRoute.Receive);
         var (runtime, updateRuntime) = UseReducer(AppRuntimeState.Initial);
         var (outgoingTransfer, setOutgoingTransfer) = UseState<OutgoingTransferViewState?>(null);
+        var (shareTargetPayload, setShareTargetPayload) = UseState<ShareTargetPayload?>(null);
         var nodeRef = UseRef<LocalSendNode?>(null);
+        var drainingActivationsRef = UseRef(false);
+
+        UseEffect(() =>
+        {
+            EventHandler activationReceived = (_, _) => ScheduleActivationDrain();
+            ShareTargetActivationBroker.ActivationReceived += activationReceived;
+            ScheduleActivationDrain();
+            return () => ShareTargetActivationBroker.ActivationReceived -= activationReceived;
+        });
 
         UseEffect(() =>
         {
@@ -80,7 +96,9 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 runtime,
                 nodeRef.Current,
                 RefreshAsync,
-                setOutgoingTransfer)),
+                setOutgoingTransfer,
+                shareTargetPayload,
+                ConsumeShareTargetPayload)),
             AppRoute.Settings => Component<SettingsPage, SettingsPageProps>(new(
                 settings,
                 updateSettings)),
@@ -141,8 +159,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 1 => ElementTheme.Light,
                 2 => ElementTheme.Dark,
                 _ => ElementTheme.Default,
-            })
-            .Backdrop(BackdropKind.Mica);
+            });
 
         return root;
 
@@ -154,6 +171,82 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                     .Where(request => request.RequestId != requestId)
                     .ToArray(),
             });
+        }
+
+        void ConsumeShareTargetPayload(Guid payloadId)
+        {
+            if (shareTargetPayload?.Id == payloadId)
+                setShareTargetPayload(null);
+        }
+
+        void ScheduleActivationDrain()
+        {
+            var dispatcher = ReactorApp.UIDispatcher;
+            if (dispatcher is null)
+                return;
+
+            if (dispatcher.HasThreadAccess)
+                _ = DrainActivationsAsync();
+            else
+                dispatcher.TryEnqueue(() => _ = DrainActivationsAsync());
+        }
+
+        async Task DrainActivationsAsync()
+        {
+            if (drainingActivationsRef.Current)
+                return;
+
+            drainingActivationsRef.Current = true;
+            try
+            {
+                while (ShareTargetActivationBroker.TryDequeue(out var activation))
+                {
+                    window?.Activate();
+                    if (activation?.Kind != ExtendedActivationKind.ShareTarget
+                        || activation.Data is not ShareTargetActivatedEventArgs shareArgs)
+                    {
+                        continue;
+                    }
+
+                    await ReceiveSharedContentAsync(shareArgs);
+                }
+            }
+            finally
+            {
+                drainingActivationsRef.Current = false;
+                if (ShareTargetActivationBroker.HasPendingActivations)
+                    ScheduleActivationDrain();
+            }
+        }
+
+        async Task ReceiveSharedContentAsync(ShareTargetActivatedEventArgs shareArgs)
+        {
+            var operation = shareArgs.ShareOperation;
+            operation.ReportStarted();
+            try
+            {
+                var payload = await ReadShareTargetPayloadAsync(operation.Data);
+                operation.ReportDataRetrieved();
+
+                setShareTargetPayload(payload);
+                if (navigation.CurrentRoute != AppRoute.Send)
+                    navigation.Navigate(AppRoute.Send);
+                window?.Activate();
+                operation.ReportCompleted();
+            }
+            catch (Exception exception)
+            {
+                try
+                {
+                    operation.ReportError(t.Message(
+                        new("App", "ShareTargetFailed"),
+                        ("error", exception.Message)));
+                }
+                catch
+                {
+                }
+                updateRuntime(current => current with { Error = exception.Message });
+            }
         }
 
         async Task RunNodeAsync(CancellationToken cancellationToken)
@@ -284,4 +377,38 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         LocalSendNodeState.Stopping => t.Message(new("App", "NodeStopping")),
         _ => t.Message(new("App", "NodeDisconnected")),
     };
+
+    private static async Task<ShareTargetPayload> ReadShareTargetPayloadAsync(DataPackageView data)
+    {
+        var items = new List<ShareTargetItem>();
+        if (data.Contains(StandardDataFormats.StorageItems))
+        {
+            var storageItems = await data.GetStorageItemsAsync();
+            foreach (var storageItem in storageItems)
+            {
+                if (string.IsNullOrWhiteSpace(storageItem.Path))
+                    continue;
+
+                items.Add(new ShareTargetItem.FileSystem(
+                    storageItem.Path,
+                    storageItem is StorageFolder));
+            }
+        }
+        else if (data.Contains(StandardDataFormats.WebLink))
+        {
+            var link = await data.GetWebLinkAsync();
+            items.Add(new ShareTargetItem.Text(link.ToString(), "shared-link.txt"));
+        }
+        else if (data.Contains(StandardDataFormats.Text))
+        {
+            var text = await data.GetTextAsync();
+            if (!string.IsNullOrWhiteSpace(text))
+                items.Add(new ShareTargetItem.Text(text, "shared-text.txt"));
+        }
+
+        if (items.Count == 0)
+            throw new InvalidDataException("The share did not contain accessible files or text.");
+
+        return new ShareTargetPayload(Guid.NewGuid(), items);
+    }
 }

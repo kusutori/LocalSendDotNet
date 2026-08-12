@@ -20,7 +20,17 @@ sealed class OutgoingTransferOverlay : Component<OutgoingTransferOverlayProps>
     public override Element Render()
     {
         var t = UseIntl();
+        var window = UseWindow();
         var transfer = Props.Transfer;
+        var taskbarProgress = new TaskbarTransferProgress(
+            transfer.State,
+            transfer.BytesTransferred,
+            transfer.TotalBytes,
+            transfer.Status);
+
+        UseEffect(() => UpdateTaskbarProgress(window, taskbarProgress), taskbarProgress);
+        UseEffect(() => () => ClearTaskbarProgress(window));
+
         var progress = transfer.TotalBytes <= 0
             ? 0
             : Math.Clamp(transfer.BytesTransferred * 100d / transfer.TotalBytes, 0, 100);
@@ -142,12 +152,21 @@ sealed class IncomingTransferOverlay : Component<IncomingTransferOverlayProps>
     public override Element Render()
     {
         var t = UseIntl();
+        var window = UseWindow();
         var request = Props.Request;
         var (view, updateView) = UseReducer(IncomingTransferViewState.Pending(
             request,
             IncomingSummary(t, request.Items)));
         var (copied, setCopied) = UseState(false);
         var cancellationRef = UseRef<CancellationTokenSource?>(null);
+        var taskbarProgress = new TaskbarTransferProgress(
+            view.State,
+            view.BytesTransferred,
+            view.TotalBytes,
+            view.Status);
+
+        UseEffect(() => UpdateTaskbarProgress(window, taskbarProgress), taskbarProgress);
+        UseEffect(() => () => ClearTaskbarProgress(window));
 
         var acceptMutation = UseMutation<bool, TransferResult>(async (_, mutationToken) =>
         {
@@ -416,6 +435,52 @@ sealed class IncomingTransferOverlay : Component<IncomingTransferOverlayProps>
 
 static class TransferOverlayVisuals
 {
+    public static void UpdateTaskbarProgress(
+        ReactorWindow? window,
+        TaskbarTransferProgress transfer)
+    {
+        if (window is null)
+            return;
+
+        var taskbar = window.TaskbarItem;
+        taskbar.Description = transfer.Description;
+
+        switch (transfer.State)
+        {
+            case TransferState.Preparing:
+            case TransferState.WaitingForAcceptance:
+                taskbar.Progress.State = TaskbarProgressState.Indeterminate;
+                break;
+
+            case TransferState.Transferring when transfer.TotalBytes > 0:
+                taskbar.Progress.State = TaskbarProgressState.Normal;
+                taskbar.Progress.Value = transfer.Fraction;
+                break;
+
+            case TransferState.Transferring:
+                taskbar.Progress.State = TaskbarProgressState.Indeterminate;
+                break;
+
+            case TransferState.Failed:
+                taskbar.Progress.State = TaskbarProgressState.Error;
+                taskbar.Progress.Value = transfer.TotalBytes > 0 ? transfer.Fraction : 1;
+                break;
+
+            default:
+                ClearTaskbarProgress(window);
+                break;
+        }
+    }
+
+    public static void ClearTaskbarProgress(ReactorWindow? window)
+    {
+        if (window is null)
+            return;
+
+        window.TaskbarItem.Progress.Clear();
+        window.TaskbarItem.Description = null;
+    }
+
     public static Element TransferDeviceCard(
         string alias,
         string? model,
@@ -511,4 +576,15 @@ static class TransferOverlayVisuals
         }
         return unit == 0 ? $"{value:0} {units[unit]}" : $"{value:0.##} {units[unit]}";
     }
+}
+
+sealed record TaskbarTransferProgress(
+    TransferState State,
+    long BytesTransferred,
+    long TotalBytes,
+    string Description)
+{
+    public double Fraction => TotalBytes <= 0
+        ? 0
+        : Math.Clamp(BytesTransferred / (double)TotalBytes, 0, 1);
 }

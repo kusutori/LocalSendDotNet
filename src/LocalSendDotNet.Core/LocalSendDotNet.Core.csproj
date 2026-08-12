@@ -6,11 +6,14 @@
     <PackageId>LocalSendDotNet.Core</PackageId>
     <Version>0.2.0-preview.2</Version>
     <Description>A UI-independent .NET implementation of the LocalSend v2.2 protocol.</Description>
-    <Authors>LocalSendDotNet contributors</Authors>
+    <Authors>kusutori; LocalSendDotNet contributors</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <RepositoryUrl>https://github.com/localsend-dotnet/LocalSendDotNet</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/kusutori/LocalSendDotNet</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/kusutori/LocalSendDotNet</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageTags>localsend;file-transfer;lan;discovery;dotnet</PackageTags>
+    <PackageReleaseNotes>https://github.com/kusutori/LocalSendDotNet/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

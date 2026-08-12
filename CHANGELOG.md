@@ -9,6 +9,7 @@
 - Allow startup retry after a corrected startup failure.
 - Require XML documentation for the complete public API and enforce an approved API-surface baseline.
 - Add a package-only consumer sample and cross-platform CI smoke build.
+- Use source-generated protocol JSON metadata so Native AOT applications can consume the core library.
 
 ## 0.2.0-preview.1
 

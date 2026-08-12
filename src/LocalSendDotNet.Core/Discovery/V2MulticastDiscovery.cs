@@ -127,7 +127,7 @@ internal sealed class V2MulticastDiscovery(
         await _announceGate.WaitAsync(linked.Token).ConfigureAwait(false);
         try
         {
-            var payload = JsonSerializer.SerializeToUtf8Bytes(createAnnouncement(), V2Json.Options);
+            var payload = JsonSerializer.SerializeToUtf8Bytes(createAnnouncement(), V2JsonContext.Default.DeviceInfoDto);
             var delays = new[] { TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2) };
             foreach (var delay in delays)
             {
@@ -147,7 +147,7 @@ internal sealed class V2MulticastDiscovery(
             try
             {
                 var result = await receiver.ReceiveFromAsync(buffer, SocketFlags.None, remote, cancellationToken).ConfigureAwait(false);
-                var message = JsonSerializer.Deserialize<DeviceInfoDto>(buffer.AsSpan(0, result.ReceivedBytes), V2Json.Options);
+                var message = JsonSerializer.Deserialize(buffer.AsSpan(0, result.ReceivedBytes), V2JsonContext.Default.DeviceInfoDto);
                 if (message is null || result.RemoteEndPoint is not IPEndPoint endpoint)
                     continue;
                 if (_registrations.TryAdd(endpoint.Address, 0))

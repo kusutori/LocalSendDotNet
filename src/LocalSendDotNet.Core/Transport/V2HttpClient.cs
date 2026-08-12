@@ -33,7 +33,7 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
         RegisterResponseDto info;
         try
         {
-            info = await client.GetFromJsonAsync<RegisterResponseDto>(V2Constants.BasePath + "/info", V2Json.Options, cancellationToken).ConfigureAwait(false)
+            info = await client.GetFromJsonAsync(V2Constants.BasePath + "/info", V2JsonContext.Default.RegisterResponseDto, cancellationToken).ConfigureAwait(false)
                 ?? throw new LocalSendException("The peer returned an empty info response.");
         }
         catch (HttpRequestException exception) when (ContainsPeerIdentityException(exception))
@@ -52,9 +52,9 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
     public async Task<RegisterResponseDto> RegisterAsync(DeviceEndpoint endpoint, string expectedFingerprint, DeviceInfoDto localInfo, CancellationToken cancellationToken)
     {
         using var client = CreateClient(endpoint, expectedFingerprint);
-        using var response = await client.PostAsJsonAsync(V2Constants.BasePath + "/register", localInfo, V2Json.Options, cancellationToken).ConfigureAwait(false);
+        using var response = await client.PostAsJsonAsync(V2Constants.BasePath + "/register", localInfo, V2JsonContext.Default.DeviceInfoDto, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<RegisterResponseDto>(V2Json.Options, cancellationToken).ConfigureAwait(false)
+        var result = await response.Content.ReadFromJsonAsync(V2JsonContext.Default.RegisterResponseDto, cancellationToken).ConfigureAwait(false)
             ?? throw new LocalSendException("The peer returned an empty register response.");
         if (!string.IsNullOrEmpty(result.Fingerprint) && !StringComparer.OrdinalIgnoreCase.Equals(result.Fingerprint, expectedFingerprint))
             throw new PeerIdentityException("The peer's register response fingerprint did not match the trusted identity.");
@@ -65,13 +65,13 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
     {
         using var client = CreateClient(endpoint, expectedFingerprint);
         var path = V2Constants.BasePath + "/prepare-upload" + (pin is null ? string.Empty : $"?pin={Uri.EscapeDataString(pin)}");
-        using var response = await client.PostAsJsonAsync(path, request, V2Json.Options, cancellationToken).ConfigureAwait(false);
+        using var response = await client.PostAsJsonAsync(path, request, V2JsonContext.Default.PrepareUploadRequestDto, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.Unauthorized)
             throw new PinRequiredException(pin is not null);
         if (response.StatusCode == HttpStatusCode.TooManyRequests)
         {
             ErrorResponseDto? error = null;
-            try { error = await response.Content.ReadFromJsonAsync<ErrorResponseDto>(V2Json.Options, cancellationToken).ConfigureAwait(false); }
+            try { error = await response.Content.ReadFromJsonAsync(V2JsonContext.Default.ErrorResponseDto, cancellationToken).ConfigureAwait(false); }
             catch (System.Text.Json.JsonException) { }
             if (error?.Message.Contains("maximum", StringComparison.OrdinalIgnoreCase) == true)
                 throw new PeerBusyException();
@@ -80,7 +80,7 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
         if (response.StatusCode == HttpStatusCode.Forbidden)
             throw new TransferDeclinedException();
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<PrepareUploadResponseDto>(V2Json.Options, cancellationToken).ConfigureAwait(false)
+        return await response.Content.ReadFromJsonAsync(V2JsonContext.Default.PrepareUploadResponseDto, cancellationToken).ConfigureAwait(false)
             ?? throw new LocalSendException("The peer returned an empty prepare-upload response.");
     }
 

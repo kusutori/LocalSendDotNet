@@ -1,5 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+    <PropertyGroup>
+        <!-- Keep the normal build unpackaged; opt into MSIX with -p:LocalSendPackaged=true. -->
+        <LocalSendPackaged Condition="'$(LocalSendPackaged)' == ''">false</LocalSendPackaged>
+        <NativeAot Condition="'$(NativeAot)' == ''">false</NativeAot>
+    </PropertyGroup>
+
     <!-- <snippet:template-shape> -->
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
@@ -11,7 +17,7 @@
         -->
         <Platforms>x64;ARM64;X86</Platforms>
         <UseWinUI>true</UseWinUI>
-        <WindowsPackageType>None</WindowsPackageType>
+        <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
         <!--
             WindowsAppSDKSelfContained bundles the Windows App SDK runtime alongside the
             published exe so the app:
@@ -31,6 +37,10 @@
         <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
         <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
         <Nullable>enable</Nullable>
+        <ReactorLocDefaultLocale>en-US</ReactorLocDefaultLocale>
+        <ReactorLocStringsPath>Strings\</ReactorLocStringsPath>
+        <!-- ReswResourceProvider reads sentence-style keys directly; MakePRI must not index them. -->
+        <EnableDefaultPriItems>false</EnableDefaultPriItems>
         <!--
             Auto-resolve RuntimeIdentifier from the host SDK when the caller hasn't pinned
             Platform / RuntimeIdentifier explicitly. Lets `dotnet build` / `dotnet run`
@@ -40,6 +50,31 @@
         <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And ('$(Platform)' == '' Or '$(Platform)' == 'AnyCPU' Or '$(Platform)' == 'Any CPU')">$(NETCoreSdkPortableRuntimeIdentifier)</RuntimeIdentifier>
     </PropertyGroup>
     <!-- </snippet:template-shape> -->
+
+    <PropertyGroup Condition="'$(LocalSendPackaged)' != 'true'">
+        <WindowsPackageType>None</WindowsPackageType>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(LocalSendPackaged)' == 'true'">
+        <WindowsPackageType>MSIX</WindowsPackageType>
+        <EnableMsixTooling>true</EnableMsixTooling>
+        <GenerateAppxPackageOnBuild Condition="'$(GenerateAppxPackageOnBuild)' == ''">false</GenerateAppxPackageOnBuild>
+        <AppxPackageSigningEnabled Condition="'$(AppxPackageSigningEnabled)' == ''">false</AppxPackageSigningEnabled>
+        <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+        <AppxBundle>Never</AppxBundle>
+        <AppxAutoIncrementPackageRevision>false</AppxAutoIncrementPackageRevision>
+        <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
+        <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
+        <GenerateTestArtifacts>false</GenerateTestArtifacts>
+        <Platform Condition="'$(Platform)' == '' Or '$(Platform)' == 'AnyCPU' Or '$(Platform)' == 'Any CPU'">x64</Platform>
+        <Configurations>Debug;Release</Configurations>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(NativeAot)' == 'true'">
+        <PublishAot>true</PublishAot>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <SelfContained>true</SelfContained>
+    </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
@@ -51,8 +86,37 @@
 
     <!-- ReswResourceProvider reads the source .resw files at runtime. -->
     <ItemGroup>
-        <Content Include="Strings\**\*.resw" CopyToOutputDirectory="PreserveNewest" />
+        <PRIResource Remove="Strings\**\*.resw" />
+        <None Include="Strings\**\*.resw"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"
+              Link="Strings\%(RecursiveDir)%(Filename)%(Extension)" />
+        <Content Include="Assets\AppIcon.svg" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
+
+    <ItemGroup Condition="'$(LocalSendPackaged)' == 'true'">
+        <AppxManifest Include="Package.appxmanifest">
+            <SubType>Designer</SubType>
+        </AppxManifest>
+        <Content Include="Images\*.png" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <!--
+        Windows App SDK currently leaves generated MRT/XAML resources in the build
+        output for unpackaged Native AOT publishes. Copy them beside the native exe
+        so WinUI can initialize its resource manager at runtime.
+    -->
+    <Target Name="_CopyWinUIResourcesForAot" AfterTargets="Publish"
+            Condition="'$(PublishAot)' == 'true' And '$(AppxPackage)' != 'true'">
+        <ItemGroup>
+            <_WinUIResourcesForAot Include="$(OutputPath)**\*.xbf" />
+            <_WinUIResourcesForAot Include="$(OutputPath)$(AssemblyName).pri"
+                                   Condition="Exists('$(OutputPath)$(AssemblyName).pri')" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_WinUIResourcesForAot)"
+              DestinationFiles="@(_WinUIResourcesForAot->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true" />
+    </Target>
 
     <!--
         Debug-only: enable the Reactor devtools surface so the *devtools* flag

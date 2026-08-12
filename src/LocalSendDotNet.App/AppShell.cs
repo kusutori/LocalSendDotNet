@@ -5,8 +5,8 @@ using Microsoft.UI.Reactor.Localization;
 using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.Globalization;
 using static Microsoft.UI.Reactor.Factories;
+using Windows.System.UserProfile;
 
 sealed class AppShell : Component
 {
@@ -20,11 +20,7 @@ sealed class AppShell : Component
         {
             1 => "zh-CN",
             2 => "en-US",
-            _ => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals(
-                "zh",
-                StringComparison.OrdinalIgnoreCase)
-                    ? "zh-CN"
-                    : "en-US",
+            _ => SystemLocale(),
         };
 
         return LocaleProvider(
@@ -33,6 +29,11 @@ sealed class AppShell : Component
             Resources,
             defaultLocale: "en-US");
     }
+
+    private static string SystemLocale() => GlobalizationPreferences.Languages.Any(
+        static language => language.StartsWith("zh", StringComparison.OrdinalIgnoreCase))
+            ? "zh-CN"
+            : "en-US";
 }
 
 sealed record LocalizedAppShellProps(

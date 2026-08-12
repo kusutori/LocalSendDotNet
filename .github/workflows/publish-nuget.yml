@@ -1,0 +1,107 @@
+name: publish-nuget
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuget-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read and validate package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(dotnet msbuild src/LocalSendDotNet.Core/LocalSendDotNet.Core.csproj -nologo -getProperty:Version | tail -n 1 | tr -d '\r')"
+          if [[ -z "$version" ]]; then
+            echo "Could not read the package version from the project." >&2
+            exit 1
+          fi
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "v${version}" ]]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match project version ${version}; expected v${version}." >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore LocalSendDotNet.Core.slnx
+
+      - name: Build
+        run: dotnet build LocalSendDotNet.Core.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test LocalSendDotNet.Core.slnx --no-build --configuration Release --filter "Skip!=Manual"
+
+      - name: Pack
+        run: >-
+          dotnet pack src/LocalSendDotNet.Core/LocalSendDotNet.Core.csproj
+          --no-build
+          --configuration Release
+          --output artifacts/nuget
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Verify package outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "artifacts/nuget/LocalSendDotNet.Core.${{ steps.version.outputs.version }}.nupkg"
+          test -f "artifacts/nuget/LocalSendDotNet.Core.${{ steps.version.outputs.version }}.snupkg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LocalSendDotNet.Core-${{ steps.version.outputs.version }}
+          path: artifacts/nuget/*.*nupkg
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: pack
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: LocalSendDotNet.Core-${{ needs.pack.outputs.version }}
+          path: artifacts/nuget
+
+      - name: NuGet login with trusted publishing
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish to nuget.org
+        run: >-
+          dotnet nuget push
+          "artifacts/nuget/LocalSendDotNet.Core.${{ needs.pack.outputs.version }}.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+          --skip-duplicate

@@ -55,6 +55,12 @@ await foreach (var request in node.WatchIncomingTransfersAsync(cancellationToken
 
 See [docs/core-api.md](docs/core-api.md) for lifecycle, discovery, send/receive, cancellation and manual-address guidance.
 
+Windows Native AOT publishing and optional MSIX packaging are documented in
+[docs/packaging.md](docs/packaging.md).
+
+The tag-gated nuget.org release process for `LocalSendDotNet.Core` is documented
+in [docs/nuget-publishing.md](docs/nuget-publishing.md).
+
 `samples/LocalSendDotNet.Sample` references the generated NuGet package rather than the source project. It is built in CI after packing to verify the consumer experience.
 
 Official-client evidence and the remaining manual scenarios are tracked in [docs/interop-matrix.md](docs/interop-matrix.md).

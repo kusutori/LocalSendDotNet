@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.Json.Serialization.Metadata;
 using LocalSendDotNet.Protocol.V2;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Connections;
@@ -74,7 +75,7 @@ internal sealed class V2Server(
     {
         if (!ConfigureRequestLimit(context, 64 * 1024))
             return;
-        var payload = await ReadJsonAsync<DeviceInfoDto>(context).ConfigureAwait(false);
+        var payload = await ReadJsonAsync(context, V2JsonContext.Default.DeviceInfoDto).ConfigureAwait(false);
         if (payload is null)
             return;
         var certificate = await context.Connection.GetClientCertificateAsync(context.RequestAborted).ConfigureAwait(false);
@@ -99,7 +100,7 @@ internal sealed class V2Server(
             DeviceType = info.DeviceType,
             Fingerprint = info.Fingerprint,
             Download = false
-        }, V2Json.Options, context.RequestAborted).ConfigureAwait(false);
+        }, V2JsonContext.Default.RegisterResponseDto, contentType: null, context.RequestAborted).ConfigureAwait(false);
     }
 
     private Task InfoAsync(HttpContext context)
@@ -113,7 +114,7 @@ internal sealed class V2Server(
             DeviceType = info.DeviceType,
             Fingerprint = info.Fingerprint,
             Download = false
-        }, V2Json.Options, context.RequestAborted);
+        }, V2JsonContext.Default.RegisterResponseDto, contentType: null, context.RequestAborted);
     }
 
     private async Task PrepareUploadAsync(HttpContext context)
@@ -121,7 +122,7 @@ internal sealed class V2Server(
         var remote = RemoteAddress(context);
         if (!ConfigureRequestLimit(context, options.MaxPrepareRequestBytes))
             return;
-        var payload = await ReadJsonAsync<PrepareUploadRequestDto>(context).ConfigureAwait(false);
+        var payload = await ReadJsonAsync(context, V2JsonContext.Default.PrepareUploadRequestDto).ConfigureAwait(false);
         if (payload is null)
             return;
         if (payload.Files.Count == 0)
@@ -161,9 +162,9 @@ internal sealed class V2Server(
         var outcome = await onPrepare(payload, remote, certFingerprint, context.RequestAborted).ConfigureAwait(false);
         context.Response.StatusCode = (int)outcome.StatusCode;
         if (outcome.Response is not null)
-            await context.Response.WriteAsJsonAsync(outcome.Response, V2Json.Options, context.RequestAborted).ConfigureAwait(false);
+            await context.Response.WriteAsJsonAsync(outcome.Response, V2JsonContext.Default.PrepareUploadResponseDto, contentType: null, context.RequestAborted).ConfigureAwait(false);
         else if (outcome.Message is not null)
-            await context.Response.WriteAsJsonAsync(new ErrorResponseDto { Message = outcome.Message }, V2Json.Options, context.RequestAborted).ConfigureAwait(false);
+            await context.Response.WriteAsJsonAsync(new ErrorResponseDto { Message = outcome.Message }, V2JsonContext.Default.ErrorResponseDto, contentType: null, context.RequestAborted).ConfigureAwait(false);
     }
 
     private async Task UploadAsync(HttpContext context)
@@ -232,11 +233,11 @@ internal sealed class V2Server(
 
     private static bool IsFingerprint(string value) => value.Length == 64 && value.All(Uri.IsHexDigit);
 
-    private static async Task<T?> ReadJsonAsync<T>(HttpContext context)
+    private static async Task<T?> ReadJsonAsync<T>(HttpContext context, JsonTypeInfo<T> jsonTypeInfo)
     {
         try
         {
-            return await context.Request.ReadFromJsonAsync<T>(V2Json.Options, context.RequestAborted).ConfigureAwait(false);
+            return await context.Request.ReadFromJsonAsync(jsonTypeInfo, context.RequestAborted).ConfigureAwait(false);
         }
         catch (Microsoft.AspNetCore.Http.BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
         {
@@ -266,7 +267,7 @@ internal sealed class V2Server(
     private static Task WriteErrorAsync(HttpContext context, HttpStatusCode status, string message)
     {
         context.Response.StatusCode = (int)status;
-        return context.Response.WriteAsJsonAsync(new ErrorResponseDto { Message = message }, V2Json.Options, context.RequestAborted);
+        return context.Response.WriteAsJsonAsync(new ErrorResponseDto { Message = message }, V2JsonContext.Default.ErrorResponseDto, contentType: null, context.RequestAborted);
     }
 
     private static IPAddress RemoteAddress(HttpContext context)

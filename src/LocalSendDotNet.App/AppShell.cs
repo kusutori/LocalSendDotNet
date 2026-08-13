@@ -3,6 +3,7 @@ using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Localization;
 using Microsoft.UI.Reactor.Navigation;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.AppLifecycle;
@@ -19,6 +20,20 @@ sealed class AppShell : Component
     public override Element Render()
     {
         var (settings, updateSettings) = UseReducer(AppSettings.Default);
+        var window = UseWindow();
+
+        UseEffect(() =>
+        {
+            if (window is not null)
+            {
+                window.AppWindow.TitleBar.PreferredTheme = settings.ThemeIndex switch
+                {
+                    1 => TitleBarTheme.Light,
+                    2 => TitleBarTheme.Dark,
+                    _ => TitleBarTheme.UseDefaultAppMode,
+                };
+            }
+        }, settings.ThemeIndex);
 
         var locale = settings.LanguageIndex switch
         {

@@ -1,0 +1,253 @@
+name: App GitHub Release
+
+on:
+  push:
+    tags:
+      - "app-v[0-9]+.[0-9]+.[0-9]+"
+      - "app-v[0-9]+.[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Application release tag, for example app-v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  APP_PROJECT: src/LocalSendDotNet.App/LocalSendDotNet.App.csproj
+  APP_MANIFEST: src/LocalSendDotNet.App/Package.appxmanifest
+
+jobs:
+  portable:
+    name: Build portable ${{ matrix.platform }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x64
+            rid: win-x64
+          - platform: ARM64
+            rid: win-arm64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Resolve release version
+        id: release
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          $tag = $env:RELEASE_TAG.Trim()
+          if ($tag.StartsWith('app-', [StringComparison]::OrdinalIgnoreCase)) {
+            $tag = $tag.Substring(4)
+          }
+          $version = $tag
+          if ($version.StartsWith('v', [StringComparison]::OrdinalIgnoreCase)) {
+            $version = $version.Substring(1)
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') {
+            throw "Version '$version' must use vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH.REVISION."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: >-
+          dotnet restore ${{ env.APP_PROJECT }}
+          -p:Platform=${{ matrix.platform }}
+          -p:NativeAot=true
+          -r ${{ matrix.rid }}
+
+      - name: Publish Native AOT application
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:RUNNER_TEMP "publish-${{ matrix.platform }}"
+          dotnet publish $env:APP_PROJECT --no-restore -c Release `
+            -r ${{ matrix.rid }} `
+            -p:Platform=${{ matrix.platform }} `
+            -p:NativeAot=true `
+            -p:Version=${{ steps.release.outputs.version }} `
+            -o $publishDir
+
+          $requiredFiles = @('LocalSendDotNet.App.exe', 'LocalSendDotNet.App.pri')
+          foreach ($requiredFile in $requiredFiles) {
+            if (-not (Test-Path (Join-Path $publishDir $requiredFile))) {
+              throw "Publish output is missing $requiredFile."
+            }
+          }
+          if ((Get-ChildItem (Join-Path $publishDir 'Strings') -Recurse -Filter *.resw).Count -lt 1) {
+            throw 'Publish output is missing localized RESW files.'
+          }
+
+          Copy-Item README.md, LICENSE, NOTICE -Destination $publishDir
+          $symbols = Get-Item (Join-Path $publishDir 'LocalSendDotNet.App.pdb')
+          $symbolsArchive = Join-Path $env:RUNNER_TEMP "LocalSendDotNet-${{ steps.release.outputs.version }}-${{ matrix.platform }}-symbols.zip"
+          Compress-Archive -Path $symbols.FullName -DestinationPath $symbolsArchive -CompressionLevel Optimal
+          Remove-Item $symbols.FullName -Force
+
+          $archive = Join-Path $env:RUNNER_TEMP "LocalSendDotNet-${{ steps.release.outputs.version }}-${{ matrix.platform }}-portable.zip"
+          Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $archive -CompressionLevel Optimal
+
+      - name: Upload portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-${{ matrix.platform }}
+          path: ${{ runner.temp }}/LocalSendDotNet-${{ steps.release.outputs.version }}-${{ matrix.platform }}-*.zip
+          if-no-files-found: error
+
+  signed-msix:
+    name: Build signed MSIX ${{ matrix.platform }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x64
+            rid: win-x64
+          - platform: ARM64
+            rid: win-arm64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Validate signing configuration
+        shell: pwsh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MSIX_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MSIX_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64)) {
+            throw 'Missing GitHub Actions secret MSIX_CERTIFICATE_BASE64.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_PASSWORD)) {
+            throw 'Missing GitHub Actions secret MSIX_CERTIFICATE_PASSWORD.'
+          }
+
+      - name: Stamp package version
+        id: package
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          $version = ./build/Set-PackageIdentity.ps1 `
+            -ManifestPath $env:APP_MANIFEST `
+            -Tag $env:RELEASE_TAG
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Import signing certificate
+        id: certificate
+        shell: pwsh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MSIX_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MSIX_CERTIFICATE_PASSWORD }}
+        run: |
+          [xml]$manifest = Get-Content -LiteralPath $env:APP_MANIFEST -Raw
+          $expectedPublisher = $manifest.Package.Identity.Publisher
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'release-signing.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
+          $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate `
+            -FilePath $certificatePath `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -Password $password
+          Remove-Item $certificatePath -Force
+          if ($certificate.Subject -ne $expectedPublisher) {
+            throw "Certificate subject '$($certificate.Subject)' does not match manifest publisher '$expectedPublisher'."
+          }
+          "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore ${{ env.APP_PROJECT }} -p:Platform=${{ matrix.platform }} -r ${{ matrix.rid }}
+
+      - name: Build signed MSIX
+        shell: pwsh
+        run: |
+          $packageDir = Join-Path $env:RUNNER_TEMP 'AppPackages\'
+          dotnet build $env:APP_PROJECT --no-restore -c Release `
+            -p:Platform=${{ matrix.platform }} `
+            -p:RuntimeIdentifier=${{ matrix.rid }} `
+            -p:LocalSendPackaged=true `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=true `
+            -p:PackageCertificateThumbprint=${{ steps.certificate.outputs.thumbprint }} `
+            -p:AppxPackageDir="$packageDir"
+
+          $package = Get-ChildItem $packageDir -Recurse -Filter *.msix |
+            Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' } |
+            Select-Object -First 1
+          if ($null -eq $package) {
+            throw 'The build completed without producing an MSIX package.'
+          }
+
+          $output = Join-Path $env:RUNNER_TEMP "LocalSendDotNet-${{ steps.package.outputs.version }}-${{ matrix.platform }}.msix"
+          Copy-Item $package.FullName $output
+
+      - name: Export public signing certificate
+        if: matrix.platform == 'x64'
+        shell: pwsh
+        run: |
+          Export-Certificate `
+            -Cert "Cert:\CurrentUser\My\${{ steps.certificate.outputs.thumbprint }}" `
+            -FilePath (Join-Path $env:RUNNER_TEMP 'LocalSendDotNet-Development.cer') `
+            -Type CERT | Out-Null
+          Copy-Item docs/development-msix-install.md `
+            (Join-Path $env:RUNNER_TEMP 'DEVELOPMENT-MSIX-INSTALL.md')
+
+      - name: Upload signed package
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-msix-${{ matrix.platform }}
+          path: |
+            ${{ runner.temp }}/LocalSendDotNet-${{ steps.package.outputs.version }}-${{ matrix.platform }}.msix
+            ${{ runner.temp }}/LocalSendDotNet-Development.cer
+            ${{ runner.temp }}/DEVELOPMENT-MSIX-INSTALL.md
+          if-no-files-found: error
+
+      - name: Remove signing certificate
+        if: always() && steps.certificate.outputs.thumbprint != ''
+        shell: pwsh
+        run: Remove-Item "Cert:\CurrentUser\My\${{ steps.certificate.outputs.thumbprint }}" -Force -ErrorAction SilentlyContinue
+
+  release:
+    name: Create GitHub Release
+    needs:
+      - portable
+      - signed-msix
+    runs-on: windows-latest
+    steps:
+      - name: Download release packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "portable-*"
+          path: packages
+          merge-multiple: true
+
+      - name: Download signed MSIX packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "signed-msix-*"
+          path: packages
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          generate_release_notes: true
+          prerelease: true
+          files: packages/*

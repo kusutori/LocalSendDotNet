@@ -58,6 +58,9 @@ See [docs/core-api.md](docs/core-api.md) for lifecycle, discovery, send/receive,
 Windows Native AOT publishing and optional MSIX packaging are documented in
 [docs/packaging.md](docs/packaging.md).
 
+Tag-driven Native AOT and signed MSIX GitHub Releases are documented in
+[docs/app-release-ci.md](docs/app-release-ci.md).
+
 The tag-gated nuget.org release process for `LocalSendDotNet.Core` is documented
 in [docs/nuget-publishing.md](docs/nuget-publishing.md).
 

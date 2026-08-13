@@ -26,12 +26,18 @@ sealed class AppShell : Component
             2 => "en-US",
             _ => SystemLocale(),
         };
-
+        var theme = settings.ThemeIndex switch
+        {
+            1 => ElementTheme.Light,
+            2 => ElementTheme.Dark,
+            _ => ElementTheme.Default,
+        };
         return LocaleProvider(
             locale,
-            Component<LocalizedAppShell, LocalizedAppShellProps>(new(settings, updateSettings)),
+            Component<LocalizedAppShell, LocalizedAppShellProps>(new(settings, updateSettings, locale)),
             Resources,
             defaultLocale: "en-US")
+            .RequestedTheme(theme)
             .Backdrop(BackdropKind.Mica);
     }
 
@@ -43,7 +49,8 @@ sealed class AppShell : Component
 
 sealed record LocalizedAppShellProps(
     AppSettings Settings,
-    Action<Func<AppSettings, AppSettings>> UpdateSettings);
+    Action<Func<AppSettings, AppSettings>> UpdateSettings,
+    string Locale);
 
 sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
 {
@@ -101,7 +108,8 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 ConsumeShareTargetPayload)),
             AppRoute.Settings => Component<SettingsPage, SettingsPageProps>(new(
                 settings,
-                updateSettings)),
+                updateSettings))
+                .WithKey($"settings:{Props.Locale}"),
             _ => TextBlock(t.Message(new("App", "PageNotFound"))),
         }) with
         {
@@ -153,13 +161,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 transferOverlay?.Grid(row: 0, column: 0))
             .Flex(grow: 1, basis: 0);
 
-        var root = FlexColumn(titleBar, contentLayer)
-            .RequestedTheme(settings.ThemeIndex switch
-            {
-                1 => ElementTheme.Light,
-                2 => ElementTheme.Dark,
-                _ => ElementTheme.Default,
-            });
+        var root = FlexColumn(titleBar, contentLayer);
 
         return root;
 

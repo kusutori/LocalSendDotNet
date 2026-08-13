@@ -37,7 +37,10 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 isActionIconVisible: false,
                 content:
                 ComboBox(themeOptions, Props.Settings.ThemeIndex, index =>
-                    Props.UpdateSettings(settings => settings with { ThemeIndex = index }))
+                {
+                    if (index is >= 0 and <= 2 && index != Props.Settings.ThemeIndex)
+                        Props.UpdateSettings(settings => settings with { ThemeIndex = index });
+                })
                     .MinWidth(180)),
             SettingsCard(
                 header: t.Message(new("App", "SettingsLanguage")),
@@ -46,7 +49,10 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 isActionIconVisible: false,
                 content:
                 ComboBox(languageOptions, Props.Settings.LanguageIndex, index =>
-                    Props.UpdateSettings(settings => settings with { LanguageIndex = index }))
+                {
+                    if (index is >= 0 and <= 2 && index != Props.Settings.LanguageIndex)
+                        Props.UpdateSettings(settings => settings with { LanguageIndex = index });
+                })
                     .MinWidth(180)),
             SettingsCard(
                 header: t.Message(new("App", "SettingsMinimizeToTray")),

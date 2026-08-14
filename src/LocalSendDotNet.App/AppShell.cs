@@ -145,7 +145,9 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             ],
             content)
             .WithNavigation(navigation, RouteTag, ParseRoute)
-            .PaneDisplayMode(NavigationViewPaneDisplayMode.Left)
+            .PaneDisplayMode(NavigationViewPaneDisplayMode.Auto)
+            .CompactModeThresholdWidth(640)
+            .ExpandedModeThresholdWidth(1008)
             .OpenPaneLength(248)
             .CompactPaneLength(56)
             .PaneToggleButtonVisible(true)

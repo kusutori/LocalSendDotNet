@@ -5,12 +5,12 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap rescap">
 
-  <Identity Name="LocalSendDotNet.App" Publisher="CN=kusut" Version="0.1.0.0" />
+  <Identity Name="LocalSendDotNet.App" Publisher="CN=kusut" Version="0.1.2.0" />
 
   <Properties>
     <DisplayName>LocalSendDotNet</DisplayName>
     <PublisherDisplayName>LocalSendDotNet</PublisherDisplayName>
-    <Logo>Images\StoreLogo.png</Logo>
+    <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
   <Dependencies>
@@ -28,13 +28,14 @@
         DisplayName="LocalSendDotNet"
         Description="Send files and text to nearby LocalSend devices."
         BackgroundColor="transparent"
-        Square150x150Logo="Images\Square150x150Logo.png"
-        Square44x44Logo="Images\Square44x44Logo.png">
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
         <uap:DefaultTile
           ShortName="LocalSendDotNet"
-          Square71x71Logo="Images\Square71x71Logo.png"
-          Wide310x150Logo="Images\Wide310x150Logo.png" />
-        <uap:SplashScreen Image="Images\SplashScreen.png" />
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
       <Extensions>
         <uap:Extension Category="windows.shareTarget">

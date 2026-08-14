@@ -101,12 +101,14 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             };
         });
 
-        var titleBar = (TitleBar("LocalSend").Tall() with
+        var titleBar = (TitleBar("LocalSend") with
         {
             Subtitle = t.Message(new("App", "Tagline")),
             RightHeader = Caption(NodeStatusText(t, runtime.NodeState))
                 .Foreground(runtime.Error is null ? Theme.SecondaryText : Theme.SystemCritical),
-        }).Flex(shrink: 0);
+        })
+        .Tall()
+        .Flex(shrink: 0);
 
         var content = NavigationHost(navigation, route => route switch
         {

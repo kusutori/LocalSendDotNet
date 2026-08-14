@@ -101,7 +101,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             };
         });
 
-        var titleBar = (TitleBar("LocalSend") with
+        var titleBar = (TitleBar("LocalSend").Tall() with
         {
             Subtitle = t.Message(new("App", "Tagline")),
             RightHeader = Caption(NodeStatusText(t, runtime.NodeState))

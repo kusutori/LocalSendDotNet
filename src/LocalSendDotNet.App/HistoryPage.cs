@@ -47,7 +47,11 @@ sealed class HistoryPage : Component<HistoryPageProps>
                 Button(t.Message(new("App", "HistoryDeleteAll")), () => setConfirmClear(true))
                     .AutomationName(t.Message(new("App", "HistoryDeleteAll")))
                     .IsEnabled(entries.Count > 0)
-                    .Foreground(Theme.SystemCritical))
+                    .Resources(static resources => resources
+                        .Set("ButtonForeground", Theme.SystemCritical)
+                        .Set("ButtonForegroundPointerOver", Theme.SystemCritical)
+                        .Set("ButtonForegroundPressed", Theme.SystemCritical)
+                        .Set("ButtonForegroundDisabled", Theme.DisabledText)))
             with { ColumnGap = 8, Wrap = FlexWrap.Wrap };
 
         Element list = entries.Count == 0
@@ -119,7 +123,7 @@ sealed class HistoryPage : Component<HistoryPageProps>
                 Grid(
                     columns: [GridSize.Auto, GridSize.Star(), GridSize.Auto],
                     rows: [GridSize.Auto],
-                    Border(Icon(FontIcon(HistoryIcon(entry.Path), fontSize: 20)).AccessibilityHidden())
+                    Border(Icon(HistoryIcon(entry.Path)).AccessibilityHidden())
                         .Size(40, 40)
                         .CornerRadius(20)
                         .Background(Theme.SubtleFill)
@@ -137,7 +141,7 @@ sealed class HistoryPage : Component<HistoryPageProps>
                         .Margin(horizontal: 12, vertical: 0)
                         .VAlign(VerticalAlignment.Center)
                         .Grid(column: 1),
-                    Button(Icon(FontIcon("\uE70D")), null)
+                    Button(Icon("\uE712"), null)
                         .SubtleButton()
                         .AutomationName(t.Message(new("App", "HistoryEntryActions"), ("file", entry.FileName)))
                         .MinWidth(40)
@@ -157,7 +161,7 @@ sealed class HistoryPage : Component<HistoryPageProps>
                                 MenuItem(
                                     t.Message(new("App", "HistoryInfo")),
                                     () => setInfoEntry(entry),
-                                    icon: "Info"),
+                                    icon: "\uE946"),
                                 MenuItem(
                                     t.Message(new("App", "HistoryDeleteItem")),
                                     () => ReceiveHistoryStore.Remove(entry.Id),
@@ -187,22 +191,8 @@ sealed class HistoryPage : Component<HistoryPageProps>
             Caption(label).Foreground(Theme.SecondaryText),
             TextBlock(value).TextWrapping(TextWrapping.WrapWholeWords));
 
-    private static string HistoryIcon(string path)
-    {
-        if (Directory.Exists(path))
-            return "Folder";
-
-        return Path.GetExtension(path).ToLowerInvariant() switch
-        {
-            ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".svg" => "Photo",
-            ".mp4" or ".mov" or ".mkv" or ".avi" or ".webm" => "Video",
-            ".mp3" or ".wav" or ".flac" or ".aac" or ".ogg" => "Audio",
-            ".txt" or ".md" or ".json" or ".xml" or ".csv" or ".log" => "Document",
-            ".zip" or ".7z" or ".rar" or ".tar" or ".gz" => "ZipFolder",
-            ".pdf" => "Document",
-            _ => "Page",
-        };
-    }
+    private static string HistoryIcon(string path) =>
+        Directory.Exists(path) ? "Folder" : "Document";
 
     private static bool PathExists(string path) =>
         !string.IsNullOrWhiteSpace(path) && (File.Exists(path) || Directory.Exists(path));

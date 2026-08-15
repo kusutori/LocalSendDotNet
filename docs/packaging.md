@@ -24,11 +24,12 @@ dotnet publish src/LocalSendDotNet.App/LocalSendDotNet.App.csproj -c Release `
   -o artifacts/publish/native-aot/win-x64
 ```
 
-The profiles enable `InvariantGlobalization`, as recommended for Reactor Native AOT.
-Automatic Chinese/English selection reads Windows' language preferences through the
-WinRT API instead of `CultureInfo`, so it continues to work without the managed
-globalization tables. Reactor DevTools remains Debug-only and is therefore absent
-from the trimmed retail binary.
+Native AOT keeps `InvariantGlobalization` off. `LocaleProvider` constructs a
+`CultureInfo` for `zh-CN` / `en-US` when loading Resw strings; invariant mode
+throws `CultureNotFoundException` as soon as the shell mounts. Language
+*detection* still uses the WinRT `GlobalizationPreferences` API rather than
+`CultureInfo.CurrentUICulture`. Reactor DevTools remains Debug-only and is
+therefore absent from the trimmed retail binary.
 
 ## MSIX
 

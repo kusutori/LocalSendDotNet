@@ -73,7 +73,9 @@
 
     <PropertyGroup Condition="'$(NativeAot)' == 'true'">
         <PublishAot>true</PublishAot>
-        <InvariantGlobalization>true</InvariantGlobalization>
+        <!-- LocaleProvider/IntlAccessor construct CultureInfo(locale). zh-CN and
+             en-US are required for Resw strings and must stay available. -->
+        <InvariantGlobalization>false</InvariantGlobalization>
         <SelfContained>true</SelfContained>
     </PropertyGroup>
 

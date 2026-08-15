@@ -2,6 +2,7 @@ using CommunityToolkit.WinUI.Controls;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
+using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using static Microsoft.UI.Reactor.Factories;
@@ -17,6 +18,7 @@ sealed class ReceivePage : Component<ReceivePageProps>
     public override Element Render()
     {
         var t = UseIntl();
+        var navigation = UseNavigation<AppRoute>();
         var autoSaveItems = UseMemo(() => new object[]
         {
             new SegmentedItem { Content = t.Message(new("App", "AutoSaveOff")) },
@@ -24,7 +26,8 @@ sealed class ReceivePage : Component<ReceivePageProps>
             new SegmentedItem { Content = t.Message(new("App", "AutoSaveOn")) },
         }, t.Locale);
         var identity = Props.Runtime.Identity;
-        var alias = identity?.Alias ?? Props.Settings.Alias;
+        var (alias, setAlias) = UseState(AppSettingsStore.Load().ResolvedAlias);
+        UseNavigationLifecycle(onNavigatedTo: _ => setAlias(AppSettingsStore.Load().ResolvedAlias));
         var fingerprint = identity?.Fingerprint;
         var fingerprintPreview = fingerprint is null ? null : fingerprint[..12];
         var shortId = fingerprint is null
@@ -85,8 +88,16 @@ sealed class ReceivePage : Component<ReceivePageProps>
 
         var page = ScrollView(
             FlexColumn(
-                Heading(t.Message(new("App", "ReceiveTitle")))
-                    .HeadingLevel(AutomationHeadingLevel.Level1),
+                FlexRow(
+                        Heading(t.Message(new("App", "ReceiveTitle")))
+                            .HeadingLevel(AutomationHeadingLevel.Level1)
+                            .Flex(grow: 1, basis: 0),
+                        Button(Icon(FontIcon("\uE121")), () => navigation.Navigate(AppRoute.History))
+                            .SubtleButton()
+                            .AutomationName(t.Message(new("App", "HistoryOpenReceiveHistory")))
+                            .MinWidth(40)
+                            .MinHeight(40))
+                    with { AlignItems = FlexAlign.Center, ColumnGap = 8 },
                 identityPanel.Flex(grow: 1, basis: 0),
                 autoSave) with
             {

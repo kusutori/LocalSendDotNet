@@ -1,3 +1,4 @@
+using LocalSendDotNet;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
@@ -10,7 +11,10 @@ using static LocalSendDotNet.App.Controls.Toolkit.SettingsCardElement;
 
 sealed record SettingsPageProps(
     AppSettings Settings,
-    Action<Func<AppSettings, AppSettings>> UpdateSettings);
+    AppRuntimeState Runtime,
+    Action<Func<AppSettings, AppSettings>> UpdateSettings,
+    Action StartOrRestartServer,
+    Action StopServer);
 
 sealed class SettingsPage : Component<SettingsPageProps>
 {
@@ -19,6 +23,13 @@ sealed class SettingsPage : Component<SettingsPageProps>
         var t = UseIntl();
         var window = UseWindow();
         var (statusMessage, setStatusMessage) = UseState<string?>(null);
+        var nodeState = Props.Runtime.NodeState;
+        var serverBusy = nodeState is LocalSendNodeState.Starting or LocalSendNodeState.Stopping;
+        var serverRunning = nodeState == LocalSendNodeState.Running;
+        var serverOnline = nodeState is LocalSendNodeState.Running or LocalSendNodeState.Starting;
+        var needsRestart = serverRunning
+            && Props.Runtime.Identity is { } identity
+            && !string.Equals(identity.Alias, Props.Settings.ResolvedAlias, StringComparison.Ordinal);
         string[] themeOptions =
         [
             t.Message(new("App", "OptionSystem")),
@@ -86,17 +97,6 @@ sealed class SettingsPage : Component<SettingsPageProps>
         var receiveCards = SettingsGroup(
             t.Message(new("App", "SettingsReceive")),
             SettingsCard(
-                header: t.Message(new("App", "SettingsDeviceName")),
-                description: t.Message(new("App", "SettingsDeviceNameDescription")),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                TextBox(Props.Settings.Alias, value =>
-                    Props.UpdateSettings(settings => settings with { Alias = value }))
-                    .Header(t.Message(new("App", "SettingsDeviceName")))
-                    .AutomationName(t.Message(new("App", "SettingsDeviceName")))
-                    .MinWidth(240)),
-            SettingsCard(
                 header: t.Message(new("App", "SettingsAutoSave")),
                 description: t.Message(new("App", "SettingsAutoSaveDescription")),
                 isClickEnabled: false,
@@ -124,6 +124,55 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 Button(t.Message(new("App", "Change")), () => _ = PickDownloadDirectoryAsync())
                     .AutomationName(t.Message(new("App", "ChangeSaveLocation")))));
 
+        var startOrRestartName = serverOnline
+            ? t.Message(new("App", "SettingsRestartServer"))
+            : t.Message(new("App", "SettingsStartServer"));
+        var stopName = t.Message(new("App", "SettingsStopServer"));
+        var serverDescription = needsRestart
+            ? t.Message(new("App", "SettingsNeedRestart"))
+            : nodeState switch
+            {
+                LocalSendNodeState.Running => t.Message(new("App", "SettingsServerRunning")),
+                LocalSendNodeState.Starting => t.Message(new("App", "NodeStarting")),
+                LocalSendNodeState.Stopping => t.Message(new("App", "NodeStopping")),
+                _ => t.Message(new("App", "SettingsServerStopped")),
+            };
+        var networkCards = SettingsGroup(
+            t.Message(new("App", "SettingsNetwork")),
+            SettingsCard(
+                header: serverOnline
+                    ? t.Message(new("App", "DeviceServer"))
+                    : t.Message(new("App", "SettingsServerOffline")),
+                description: serverDescription,
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                HStack(4,
+                    Button(Icon(serverOnline ? "Refresh" : "Play"), Props.StartOrRestartServer)
+                        .SubtleButton()
+                        .AutomationName(startOrRestartName)
+                        .ToolTip(startOrRestartName)
+                        .IsEnabled(!serverBusy)
+                        .MinWidth(40)
+                        .MinHeight(40),
+                    Button(Icon("Stop"), Props.StopServer)
+                        .SubtleButton()
+                        .AutomationName(stopName)
+                        .ToolTip(stopName)
+                        .IsEnabled(serverRunning && !serverBusy)
+                        .MinWidth(40)
+                        .MinHeight(40))),
+            SettingsCard(
+                header: t.Message(new("App", "SettingsDeviceName")),
+                description: t.Message(new("App", "SettingsDeviceNameDescription")),
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                TextBox(Props.Settings.Alias, value =>
+                    Props.UpdateSettings(settings => settings with { Alias = value }))
+                    .AutomationName(t.Message(new("App", "SettingsDeviceName")))
+                    .MinWidth(240)));
+
         return ScrollView(
             VStack(24,
                 Heading(t.Message(new("App", "SettingsTitle")))
@@ -136,8 +185,16 @@ sealed class SettingsPage : Component<SettingsPageProps>
                         IsClosable = true,
                         OnClosed = () => setStatusMessage(null),
                     }).Severity(InfoBarSeverity.Error),
+                Props.Runtime.Error is null
+                    ? null
+                    : (InfoBar(t.Message(new("App", "NetworkStartFailed")), Props.Runtime.Error) with
+                    {
+                        IsOpen = true,
+                        IsClosable = false,
+                    }).Severity(InfoBarSeverity.Error),
                 generalCards,
-                receiveCards)
+                receiveCards,
+                networkCards)
             .Padding(36))
             .HorizontalContentAlignment(HorizontalAlignment.Stretch)
             .Landmark(AutomationLandmarkType.Main);

@@ -2,15 +2,22 @@ using System.Runtime.InteropServices;
 using Microsoft.UI.Reactor;
 using Microsoft.Windows.AppLifecycle;
 using Package = Windows.ApplicationModel.Package;
+using WinAppStorage = Microsoft.Windows.Storage;
+using WinRtStorage = Windows.Storage;
 
 static class AppPlatform
 {
     public const string MinimizedArgument = "--minimized";
     public const string StartupTaskId = "LocalSendStartup";
+    private const string UnpackagedPublisher = "kusutori";
+    private const string UnpackagedProduct = "LocalSendDotNet";
 
-    public static string DataDirectory { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LocalSendDotNet");
+    private static readonly Lazy<string> DataDirectoryValue = new(ResolveDataDirectory);
+    private static readonly Lazy<string> DefaultDownloadDirectoryValue = new(ResolveDefaultDownloadDirectory);
+
+    public static string DataDirectory => DataDirectoryValue.Value;
+
+    public static string DefaultDownloadDirectory => DefaultDownloadDirectoryValue.Value;
 
     public static bool StartHidden { get; } = DetectStartHidden();
 
@@ -44,6 +51,34 @@ static class AppPlatform
                 ? WindowIcon.FromPath(path)
                 : WindowIcon.FromPath(ExecutablePath);
         }
+    }
+
+    private static string ResolveDefaultDownloadDirectory()
+    {
+        try
+        {
+            var path = WinRtStorage.UserDataPaths.GetDefault().Downloads;
+            if (!string.IsNullOrWhiteSpace(path))
+                return path;
+        }
+        catch
+        {
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads");
+    }
+
+    private static string ResolveDataDirectory()
+    {
+        var directory = HasPackageIdentity()
+            ? WinRtStorage.ApplicationData.Current.LocalFolder.Path
+            : WinAppStorage.ApplicationData.GetForUnpackaged(
+                UnpackagedPublisher,
+                UnpackagedProduct).LocalPath;
+        Directory.CreateDirectory(directory);
+        return directory;
     }
 
     private static bool DetectStartHidden()

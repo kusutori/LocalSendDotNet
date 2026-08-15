@@ -3,6 +3,7 @@ using LocalSendDotNet;
 enum AppRoute
 {
     Receive,
+    History,
     Send,
     Settings,
 }
@@ -34,9 +35,10 @@ sealed record AppSettings(
         StartWithWindows: false,
         AnimationsEnabled: true,
         FavoritesOnly: false,
-        DownloadDirectory: Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "Downloads"));
+        DownloadDirectory: AppPlatform.DefaultDownloadDirectory);
+
+    public string ResolvedAlias =>
+        string.IsNullOrWhiteSpace(Alias) ? Default.Alias : Alias.Trim();
 }
 
 sealed record AppRuntimeState(
@@ -76,3 +78,11 @@ abstract record ShareTargetItem
 
     public sealed record Text(string Value, string FileName) : ShareTargetItem;
 }
+
+sealed record ReceiveHistoryEntry(
+    Guid Id,
+    string FileName,
+    string Path,
+    long Size,
+    string SenderAlias,
+    DateTimeOffset ReceivedAt);

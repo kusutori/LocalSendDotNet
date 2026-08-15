@@ -6,7 +6,7 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap5 rescap">
 
-  <Identity Name="LocalSendDotNet.App" Publisher="CN=kusut" Version="0.1.3.0" />
+  <Identity Name="LocalSendDotNet.App" Publisher="CN=kusutori" Version="0.1.3.0" />
 
   <Properties>
     <DisplayName>LocalSendDotNet</DisplayName>

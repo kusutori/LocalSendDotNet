@@ -6,6 +6,8 @@ static class AppSettingsStore
     private static readonly string FilePath = Path.Combine(AppPlatform.DataDirectory, "settings.json");
     private static AppSettings? _cached;
 
+    public static event Action? Changed;
+
     public static AppSettings Load()
     {
         if (_cached is { } cached)
@@ -28,10 +30,13 @@ static class AppSettingsStore
 
     public static void Save(AppSettings settings)
     {
+        var previous = _cached;
         _cached = settings;
         Directory.CreateDirectory(AppPlatform.DataDirectory);
         var json = JsonSerializer.Serialize(AppSettingsFile.FromSettings(settings), AppSettingsJsonContext.Default.AppSettingsFile);
         File.WriteAllText(FilePath, json);
+        if (previous != settings)
+            Changed?.Invoke();
     }
 }
 

@@ -350,6 +350,8 @@ sealed class IncomingTransferOverlay : Component<IncomingTransferOverlayProps>
             try
             {
                 var result = await acceptMutation.RunAsync(true);
+                if (result.IsSuccess)
+                    ReceiveHistoryStore.Record(request.Sender.Alias, result);
                 var receivedText = showText && result.IsSuccess
                     ? await ReadReceivedTextAsync(result)
                     : view.Text;

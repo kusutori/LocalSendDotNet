@@ -115,9 +115,15 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         var (runtime, updateRuntime) = UseReducer(AppRuntimeState.Initial);
         var (outgoingTransfer, setOutgoingTransfer) = UseState<OutgoingTransferViewState?>(null);
         var (shareTargetPayload, setShareTargetPayload) = UseState<ShareTargetPayload?>(null);
+        var (serverDesired, setServerDesired) = UseState(true);
+        var (serverEpoch, updateServerEpoch) = UseReducer(0);
         var nodeRef = UseRef<LocalSendNode?>(null);
         var drainingActivationsRef = UseRef(false);
         var trayIcon = UseRef<WinUIEx.TrayIcon?>(null);
+        var nodeLifecycleRef = UseRef<SemaphoreSlim?>(null);
+        var nodeLifecycle = nodeLifecycleRef.Current ??= new SemaphoreSlim(1, 1);
+        var nextNodeSession = UseRef(0);
+        var ownerNodeSession = UseRef(0);
 
         UseEffect(() =>
         {
@@ -201,14 +207,27 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
 
         UseEffect(() =>
         {
+            var session = ++nextNodeSession.Current;
             var cancellation = new CancellationTokenSource();
-            _ = RunNodeAsync(cancellation.Token);
+            _ = RunNodeSessionAsync(session, serverDesired, cancellation.Token);
             return () =>
             {
                 cancellation.Cancel();
-                _ = DisposeNodeAsync(cancellation);
+                _ = CleanupNodeSessionAsync();
+
+                async Task CleanupNodeSessionAsync()
+                {
+                    try
+                    {
+                        await DisposeNodeSessionAsync(session).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        cancellation.Dispose();
+                    }
+                }
             };
-        });
+        }, serverDesired, serverEpoch);
 
         var titleBar = (TitleBar("LocalSend") with
         {
@@ -226,6 +245,8 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 runtime,
                 settings,
                 updateSettings)),
+            AppRoute.History => Component<HistoryPage, HistoryPageProps>(
+                new(settings.DownloadDirectory)),
             AppRoute.Send => Component<SendPage, SendPageProps>(new(
                 runtime,
                 nodeRef.Current,
@@ -235,7 +256,10 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 ConsumeShareTargetPayload)),
             AppRoute.Settings => Component<SettingsPage, SettingsPageProps>(new(
                 settings,
-                updateSettings))
+                runtime,
+                updateSettings,
+                StartOrRestartServer,
+                StopServer))
                 .WithKey($"settings:{Props.Locale}"),
             _ => TextBlock(t.Message(new("App", "PageNotFound"))),
         }) with
@@ -371,26 +395,72 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             }
         }
 
-        async Task RunNodeAsync(CancellationToken cancellationToken)
+        void StartOrRestartServer()
         {
-            var dataDirectory = AppPlatform.DataDirectory;
-            var node = new LocalSendNode(new LocalSendOptions
-            {
-                Alias = settings.Alias,
-                DeviceModel = Environment.MachineName,
-                DeviceType = LocalSendDeviceType.Desktop,
-                DataDirectory = dataDirectory,
-                DownloadDirectory = settings.DownloadDirectory,
-            });
-            nodeRef.Current = node;
             updateRuntime(current => current with
             {
                 NodeState = LocalSendNodeState.Starting,
+                Devices = [],
+                IncomingTransfers = [],
                 Error = null,
             });
+            setServerDesired(true);
+            updateServerEpoch(epoch => epoch + 1);
+        }
 
+        void StopServer()
+        {
+            if (!serverDesired && runtime.NodeState is LocalSendNodeState.Stopped
+                or LocalSendNodeState.Created or LocalSendNodeState.Disposed)
+                return;
+
+            updateRuntime(current => current with
+            {
+                NodeState = LocalSendNodeState.Stopping,
+                Devices = [],
+                IncomingTransfers = [],
+                Error = null,
+            });
+            setServerDesired(false);
+        }
+
+        async Task RunNodeSessionAsync(int session, bool desired, CancellationToken cancellationToken)
+        {
+            await nodeLifecycle.WaitAsync().ConfigureAwait(false);
+            LocalSendNode? node = null;
             try
             {
+                await DisposeCurrentNodeCoreAsync().ConfigureAwait(false);
+                if (!desired || cancellationToken.IsCancellationRequested)
+                {
+                    updateRuntime(current => current with
+                    {
+                        NodeState = LocalSendNodeState.Stopped,
+                        Devices = [],
+                        IncomingTransfers = [],
+                        Error = null,
+                    });
+                    return;
+                }
+
+                node = new LocalSendNode(new LocalSendOptions
+                {
+                    Alias = settings.ResolvedAlias,
+                    DeviceModel = Environment.MachineName,
+                    DeviceType = LocalSendDeviceType.Desktop,
+                    DataDirectory = AppPlatform.DataDirectory,
+                    DownloadDirectory = settings.DownloadDirectory,
+                });
+                nodeRef.Current = node;
+                ownerNodeSession.Current = session;
+                updateRuntime(current => current with
+                {
+                    NodeState = LocalSendNodeState.Starting,
+                    Devices = [],
+                    IncomingTransfers = [],
+                    Error = null,
+                });
+
                 await node.StartAsync(cancellationToken).ConfigureAwait(false);
                 updateRuntime(current => current with
                 {
@@ -399,7 +469,30 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                     Devices = node.GetDevices(),
                     Error = null,
                 });
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                updateRuntime(current => current with
+                {
+                    NodeState = node?.State ?? LocalSendNodeState.Faulted,
+                    Error = exception.Message,
+                });
+                return;
+            }
+            finally
+            {
+                nodeLifecycle.Release();
+            }
 
+            if (node is null || cancellationToken.IsCancellationRequested)
+                return;
+
+            try
+            {
                 await Task.WhenAll(
                     WatchDevicesAsync(node, cancellationToken),
                     WatchIncomingTransfersAsync(node, cancellationToken)).ConfigureAwait(false);
@@ -407,13 +500,37 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
             }
-            catch (Exception exception)
+        }
+
+        async Task DisposeNodeSessionAsync(int session)
+        {
+            await nodeLifecycle.WaitAsync().ConfigureAwait(false);
+            try
             {
-                updateRuntime(current => current with
-                {
-                    NodeState = node.State,
-                    Error = exception.Message,
-                });
+                if (ownerNodeSession.Current != session)
+                    return;
+
+                await DisposeCurrentNodeCoreAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                nodeLifecycle.Release();
+            }
+        }
+
+        async Task DisposeCurrentNodeCoreAsync()
+        {
+            ownerNodeSession.Current = 0;
+            if (nodeRef.Current is not { } node)
+                return;
+
+            nodeRef.Current = null;
+            try
+            {
+                await node.DisposeAsync().ConfigureAwait(false);
+            }
+            catch
+            {
             }
         }
 
@@ -460,23 +577,13 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             }
         }
 
-        async Task DisposeNodeAsync(CancellationTokenSource cancellation)
-        {
-            try
-            {
-                if (nodeRef.Current is { } node)
-                    await node.DisposeAsync().ConfigureAwait(false);
-            }
-            finally
-            {
-                cancellation.Dispose();
-            }
-        }
+
     }
 
     private static string RouteTag(AppRoute route) => route switch
     {
         AppRoute.Receive => "receive",
+        AppRoute.History => "receive",
         AppRoute.Send => "send",
         AppRoute.Settings => "settings",
         _ => "receive",

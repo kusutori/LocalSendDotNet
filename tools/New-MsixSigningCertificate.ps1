@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Subject = "CN=kusut",
+    [string]$Subject = "CN=kusutori",
     [string]$CerPath = (Join-Path $PSScriptRoot "..\artifacts\signing\LocalSendDotNet.cer"),
     [int]$YearsValid = 2
 )

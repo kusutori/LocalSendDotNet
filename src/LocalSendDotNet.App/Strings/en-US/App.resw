@@ -54,6 +54,26 @@
   <data name="Fingerprint" xml:space="preserve"><value>Fingerprint  {fingerprint}…</value></data>
   <data name="Folder" xml:space="preserve"><value>Folder</value></data>
   <data name="FolderEmpty" xml:space="preserve"><value>The selected folder has no files that can be sent.</value></data>
+  <data name="HistoryBack" xml:space="preserve"><value>Back</value></data>
+  <data name="HistoryDeleteAll" xml:space="preserve"><value>Delete history</value></data>
+  <data name="HistoryDeleteAllConfirm" xml:space="preserve"><value>Delete receive history?</value></data>
+  <data name="HistoryDeleteAllConfirmMessage" xml:space="preserve"><value>This removes the local history list. Files already saved on disk are not deleted.</value></data>
+  <data name="HistoryDeleteItem" xml:space="preserve"><value>Remove from history</value></data>
+  <data name="HistoryEmpty" xml:space="preserve"><value>No received files yet.</value></data>
+  <data name="HistoryEntryActions" xml:space="preserve"><value>Actions for {file}</value></data>
+  <data name="HistoryInfo" xml:space="preserve"><value>Info</value></data>
+  <data name="HistoryInfoFileName" xml:space="preserve"><value>File name</value></data>
+  <data name="HistoryInfoPath" xml:space="preserve"><value>Path</value></data>
+  <data name="HistoryInfoSender" xml:space="preserve"><value>Sender</value></data>
+  <data name="HistoryInfoSize" xml:space="preserve"><value>Size</value></data>
+  <data name="HistoryInfoTime" xml:space="preserve"><value>Time</value></data>
+  <data name="HistoryInfoTitle" xml:space="preserve"><value>File info</value></data>
+  <data name="HistoryOpenDirectory" xml:space="preserve"><value>Open folder</value></data>
+  <data name="HistoryOpenFile" xml:space="preserve"><value>Open file</value></data>
+  <data name="HistoryOpenReceiveHistory" xml:space="preserve"><value>Receive history</value></data>
+  <data name="HistoryShowInFolder" xml:space="preserve"><value>Show in File Explorer</value></data>
+  <data name="HistorySubtitle" xml:space="preserve"><value>{date} · {size} · {sender}</value></data>
+  <data name="HistoryTitle" xml:space="preserve"><value>Receive history</value></data>
   <data name="IdentityLoading" xml:space="preserve"><value>Loading identity…</value></data>
   <data name="IncomingFileSummary" xml:space="preserve"><value>Wants to send you the file {file}.</value></data>
   <data name="IncomingItemsSummary" xml:space="preserve"><value>Wants to send you {count} items.</value></data>
@@ -126,16 +146,24 @@
   <data name="SettingsAutoSave" xml:space="preserve"><value>Auto save</value></data>
   <data name="SettingsAutoSaveDescription" xml:space="preserve"><value>Automatically accept and save incoming content.</value></data>
   <data name="SettingsDeviceName" xml:space="preserve"><value>Device name</value></data>
-  <data name="SettingsDeviceNameDescription" xml:space="preserve"><value>Other devices see this name; restart the app after changing it.</value></data>
+  <data name="SettingsDeviceNameDescription" xml:space="preserve"><value>Other devices see this name. Restart the server to apply a change.</value></data>
   <data name="SettingsFavoritesOnly" xml:space="preserve"><value>Only auto-receive from favorites</value></data>
   <data name="SettingsFavoritesOnlyDescription" xml:space="preserve"><value>When auto save is on, trust only devices in your favorites.</value></data>
   <data name="SettingsGeneral" xml:space="preserve"><value>General</value></data>
   <data name="SettingsLanguage" xml:space="preserve"><value>Language</value></data>
   <data name="SettingsLanguageDescription" xml:space="preserve"><value>Change the language used by the interface.</value></data>
+  <data name="SettingsNeedRestart" xml:space="preserve"><value>Settings changed. Restart the server to apply them.</value></data>
+  <data name="SettingsNetwork" xml:space="preserve"><value>Network</value></data>
   <data name="SettingsMinimizeToTray" xml:space="preserve"><value>Minimize to the system tray when closing</value></data>
   <data name="SettingsMinimizeToTrayDescription" xml:space="preserve"><value>Keep receiving in the background when the main window closes.</value></data>
   <data name="SettingsReceive" xml:space="preserve"><value>Receive</value></data>
+  <data name="SettingsRestartServer" xml:space="preserve"><value>Restart server</value></data>
   <data name="SettingsSaveLocation" xml:space="preserve"><value>Save location</value></data>
+  <data name="SettingsServerOffline" xml:space="preserve"><value>Server (offline)</value></data>
+  <data name="SettingsServerRunning" xml:space="preserve"><value>The receive service is running.</value></data>
+  <data name="SettingsServerStopped" xml:space="preserve"><value>The receive service is stopped.</value></data>
+  <data name="SettingsStartServer" xml:space="preserve"><value>Start server</value></data>
+  <data name="SettingsStopServer" xml:space="preserve"><value>Stop server</value></data>
   <data name="SettingsStartWithWindows" xml:space="preserve"><value>Start after signing in</value></data>
   <data name="SettingsStartWithWindowsDescription" xml:space="preserve"><value>Run LocalSend automatically after signing in to Windows.</value></data>
   <data name="StartupDisabledByPolicy" xml:space="preserve"><value>Windows policy is blocking LocalSend from starting at sign-in.</value></data>

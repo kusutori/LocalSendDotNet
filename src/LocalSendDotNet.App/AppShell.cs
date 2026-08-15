@@ -74,11 +74,24 @@ sealed class AppShell : Component
             2 => ElementTheme.Dark,
             _ => ElementTheme.Default,
         };
-        return LocaleProvider(
+        var startHidden = AppPlatform.StartHidden && settings.MinimizeToTray;
+        var (splashVisible, _) = UseState(!startHidden && settings.AnimationsEnabled);
+
+        var shell = LocaleProvider(
             locale,
             Component<LocalizedAppShell, LocalizedAppShellProps>(new(settings, updateSettings, locale)),
             Resources,
             defaultLocale: "en-US")
+            .RequestedTheme(theme);
+
+        if (!splashVisible)
+            return shell.Backdrop(BackdropKind.Mica);
+
+        return Grid(
+                columns: [GridSize.Star()],
+                rows: [GridSize.Star()],
+                shell.Grid(row: 0, column: 0),
+                Component<StartupSplashOverlay>().Grid(row: 0, column: 0))
             .RequestedTheme(theme)
             .Backdrop(BackdropKind.Mica);
     }
@@ -208,6 +221,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 .Foreground(runtime.Error is null ? Theme.SecondaryText : Theme.SystemCritical),
         })
         .Tall()
+        .Icon(ImageIcon(new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"), UriKind.Absolute)))
         .Flex(shrink: 0);
 
         var content = NavigationHost(navigation, route => route switch

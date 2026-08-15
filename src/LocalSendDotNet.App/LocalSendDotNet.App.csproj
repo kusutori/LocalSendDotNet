@@ -80,6 +80,7 @@
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
         <PackageReference Include="CommunityToolkit.WinUI.Controls.Segmented" />
+        <PackageReference Include="CommunityToolkit.WinUI.Lottie" />
         <PackageReference Include="Microsoft.WindowsAppSDK" />
         <PackageReference Include="Microsoft.UI.Reactor" />
         <PackageReference Include="WinUIEx" />
@@ -95,6 +96,7 @@
               Link="Strings\%(RecursiveDir)%(Filename)%(Extension)" />
         <Content Include="Assets\AppIcon.svg" CopyToOutputDirectory="PreserveNewest" />
         <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+        <Content Include="Assets\SplashLogo.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(LocalSendPackaged)' == 'true'">

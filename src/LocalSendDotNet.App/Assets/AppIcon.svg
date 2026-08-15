@@ -44,7 +44,13 @@
   <g fill="none" stroke="url(#glyph)" stroke-width="18"
      stroke-linecap="round" stroke-linejoin="round"
      filter="url(#glyphLift)">
-    <circle cx="128" cy="128" r="76" stroke-dasharray="82 22"/>
+    <!-- Original 82/22 ring, as explicit arcs so rasterizers keep every dash.
+         Four long marks plus a shorter wrap so the lengths stay staggered. -->
+    <path d="M204.000 128.000 A 76 76 0 0 1 163.891 194.991"/>
+    <path d="M143.276 202.449 A 76 76 0 0 1 69.590 176.624"/>
+    <path d="M58.141 157.928 A 76 76 0 0 1 68.628 80.555"/>
+    <path d="M84.641 65.582 A 76 76 0 0 1 162.543 60.304"/>
+    <path d="M180.429 72.980 A 76 76 0 0 1 204.000 128.000"/>
     <path d="M79 128h98M150 99l29 29-29 29"/>
   </g>
 </svg>

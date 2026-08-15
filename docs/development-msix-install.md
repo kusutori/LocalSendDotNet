@@ -1,27 +1,21 @@
 # Development MSIX installation
 
-The MSIX files in GitHub Releases are signed with the project's self-signed
-`CN=kusut` certificate. Windows does not trust this certificate by default.
-Future Microsoft Store packages use Microsoft's Store signature and do not require
-these steps.
+GitHub Releases ship a standard AppPackages sideload ZIP for each architecture
+(`LocalSendDotNet-<version>-x64.zip` or `...-ARM64.zip`, plus `-aot` variants).
+The ZIP contains `Install.ps1`, the `.msix`, and the matching certificate.
 
-## Verify and trust the certificate
+1. Download the ZIP that matches the computer: `x64` for Intel/AMD PCs, `ARM64`
+   for Windows on Arm. Use the `-aot` ZIP only when you want the Native AOT
+   build.
+2. Extract the archive.
+3. In the extracted `*_Test` folder, run `Install.ps1` (or
+   `Add-AppDevPackage.ps1`). The script installs the certificate if needed and
+   then installs the package.
 
-1. Download `LocalSendDotNet-Development.cer` from the same GitHub Release as the
-   MSIX.
-2. Open the certificate and confirm that **Issued to** and **Issued by** are both
-   `kusut`.
-3. On the **Details** tab, confirm that the SHA-1 thumbprint is
-   `03A206B72E0E34C7FFA1528F27EBFF97C2BAAC59`.
-4. Select **Install Certificate**, choose **Local Machine**, then place it in
-   **Trusted People**. Administrator approval is required.
-5. Install the MSIX matching the computer architecture: `x64` for normal Intel/AMD
-   Windows PCs or `ARM64` for Windows on Arm.
+Only install packages downloaded directly from the
+`kusutori/LocalSendDotNet` GitHub repository. Remove the development certificate
+from the Local Machine **Trusted People** store when these builds are no longer
+needed.
 
-Only trust the certificate when the files were downloaded directly from the
-`kusutori/LocalSendDotNet` GitHub repository. Remove it from the Local Machine
-**Trusted People** certificate store when development builds are no longer needed.
-
-This development certificate is valid through August 12, 2028. A future certificate
-rotation requires updating this document and trusting the replacement certificate
-before installing later releases.
+Future Microsoft Store packages use Microsoft's Store signature and do not
+require this sideload script.

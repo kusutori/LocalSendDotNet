@@ -4,8 +4,12 @@ The `App GitHub Release` workflow creates these Windows assets for x64 and ARM64
 
 - a self-contained Native AOT portable ZIP;
 - a separate native-symbols ZIP;
-- an MSIX signed with the project's self-signed development certificate;
-- the public certificate and its installation instructions.
+- a signed managed MSIX sideload ZIP (`LocalSendDotNet-<version>-<platform>.zip`);
+- a signed Native AOT MSIX sideload ZIP (`LocalSendDotNet-<version>-<platform>-aot.zip`).
+
+Each MSIX ZIP is the standard `*_Test` AppPackages folder: `Install.ps1`,
+`Add-AppDevPackage.ps1`, the `.msix`, and the matching `.cer`. Unzip it and run
+`Install.ps1`.
 
 The workflow runs for tags in `app-vMAJOR.MINOR.PATCH` or
 `app-vMAJOR.MINOR.PATCH.REVISION` form and can also be started manually. The `app-`
@@ -48,6 +52,4 @@ The tag is converted to the four-part MSIX version (`app-v0.1.0` becomes
 `0.1.0.0`). Prerelease suffixes such as `app-v0.1.0-preview.1` are intentionally
 rejected because MSIX versions contain four numeric components.
 
-The public `.cer` is attached to the GitHub Release beside the signed MSIX. It is
-safe to distribute, but users must explicitly trust it as documented in
-`development-msix-install.md`. The private key never becomes a release artifact.
+The private key never becomes a release artifact.

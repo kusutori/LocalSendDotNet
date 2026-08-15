@@ -6,12 +6,8 @@ using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.Windows.AppLifecycle;
 using static Microsoft.UI.Reactor.Factories;
-using Windows.ApplicationModel.Activation;
-using Windows.ApplicationModel.DataTransfer;
 using Windows.System.UserProfile;
-using Windows.Storage;
 
 sealed class AppShell : Component
 {
@@ -342,12 +338,12 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 return;
 
             if (dispatcher.HasThreadAccess)
-                _ = DrainActivationsAsync();
+                DrainActivations();
             else
-                dispatcher.TryEnqueue(() => _ = DrainActivationsAsync());
+                dispatcher.TryEnqueue(DrainActivations);
         }
 
-        async Task DrainActivationsAsync()
+        void DrainActivations()
         {
             if (drainingActivationsRef.Current)
                 return;
@@ -355,16 +351,16 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             drainingActivationsRef.Current = true;
             try
             {
-                while (ShareTargetActivationBroker.TryDequeue(out var activation))
+                RestoreWindow();
+                while (ShareTargetActivationBroker.TryDequeue(out var payload))
                 {
-                    RestoreWindow();
-                    if (activation?.Kind != ExtendedActivationKind.ShareTarget
-                        || activation.Data is not ShareTargetActivatedEventArgs shareArgs)
-                    {
+                    if (payload is null)
                         continue;
-                    }
 
-                    await ReceiveSharedContentAsync(shareArgs);
+                    setShareTargetPayload(payload);
+                    if (navigation.CurrentRoute != AppRoute.Send)
+                        navigation.Navigate(AppRoute.Send);
+                    RestoreWindow();
                 }
             }
             finally
@@ -372,36 +368,6 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 drainingActivationsRef.Current = false;
                 if (ShareTargetActivationBroker.HasPendingActivations)
                     ScheduleActivationDrain();
-            }
-        }
-
-        async Task ReceiveSharedContentAsync(ShareTargetActivatedEventArgs shareArgs)
-        {
-            var operation = shareArgs.ShareOperation;
-            operation.ReportStarted();
-            try
-            {
-                var payload = await ReadShareTargetPayloadAsync(operation.Data);
-                operation.ReportDataRetrieved();
-
-                setShareTargetPayload(payload);
-                if (navigation.CurrentRoute != AppRoute.Send)
-                    navigation.Navigate(AppRoute.Send);
-                RestoreWindow();
-                operation.ReportCompleted();
-            }
-            catch (Exception exception)
-            {
-                try
-                {
-                    operation.ReportError(t.Message(
-                        new("App", "ShareTargetFailed"),
-                        ("error", exception.Message)));
-                }
-                catch
-                {
-                }
-                updateRuntime(current => current with { Error = exception.Message });
             }
         }
 
@@ -531,38 +497,4 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         LocalSendNodeState.Stopping => t.Message(new("App", "NodeStopping")),
         _ => t.Message(new("App", "NodeDisconnected")),
     };
-
-    private static async Task<ShareTargetPayload> ReadShareTargetPayloadAsync(DataPackageView data)
-    {
-        var items = new List<ShareTargetItem>();
-        if (data.Contains(StandardDataFormats.StorageItems))
-        {
-            var storageItems = await data.GetStorageItemsAsync();
-            foreach (var storageItem in storageItems)
-            {
-                if (string.IsNullOrWhiteSpace(storageItem.Path))
-                    continue;
-
-                items.Add(new ShareTargetItem.FileSystem(
-                    storageItem.Path,
-                    storageItem is StorageFolder));
-            }
-        }
-        else if (data.Contains(StandardDataFormats.WebLink))
-        {
-            var link = await data.GetWebLinkAsync();
-            items.Add(new ShareTargetItem.Text(link.ToString(), "shared-link.txt"));
-        }
-        else if (data.Contains(StandardDataFormats.Text))
-        {
-            var text = await data.GetTextAsync();
-            if (!string.IsNullOrWhiteSpace(text))
-                items.Add(new ShareTargetItem.Text(text, "shared-text.txt"));
-        }
-
-        if (items.Count == 0)
-            throw new InvalidDataException("The share did not contain accessible files or text.");
-
-        return new ShareTargetPayload(Guid.NewGuid(), items);
-    }
 }

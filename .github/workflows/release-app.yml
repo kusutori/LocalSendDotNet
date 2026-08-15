@@ -105,7 +105,7 @@ jobs:
           if-no-files-found: error
 
   signed-msix:
-    name: Build signed MSIX ${{ matrix.platform }}
+    name: Build signed MSIX ${{ matrix.platform }}${{ matrix.package_suffix }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -113,8 +113,20 @@ jobs:
         include:
           - platform: x64
             rid: win-x64
+            aot: false
+            package_suffix: ""
           - platform: ARM64
             rid: win-arm64
+            aot: false
+            package_suffix: ""
+          - platform: x64
+            rid: win-x64
+            aot: true
+            package_suffix: "-aot"
+          - platform: ARM64
+            rid: win-arm64
+            aot: true
+            package_suffix: "-aot"
 
     steps:
       - name: Check out repository
@@ -172,50 +184,71 @@ jobs:
           "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
 
       - name: Restore
-        run: dotnet restore ${{ env.APP_PROJECT }} -p:Platform=${{ matrix.platform }} -r ${{ matrix.rid }}
+        run: >-
+          dotnet restore ${{ env.APP_PROJECT }}
+          -p:Platform=${{ matrix.platform }}
+          -p:RuntimeIdentifier=${{ matrix.rid }}
+          -p:LocalSendPackaged=true
+          -p:NativeAot=${{ matrix.aot }}
 
       - name: Build signed MSIX
         shell: pwsh
+        env:
+          AOT: ${{ matrix.aot }}
+          PLATFORM: ${{ matrix.platform }}
+          RID: ${{ matrix.rid }}
+          THUMBPRINT: ${{ steps.certificate.outputs.thumbprint }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+          PACKAGE_SUFFIX: ${{ matrix.package_suffix }}
         run: |
           $packageDir = Join-Path $env:RUNNER_TEMP 'AppPackages\'
-          dotnet build $env:APP_PROJECT --no-restore -c Release `
-            -p:Platform=${{ matrix.platform }} `
-            -p:RuntimeIdentifier=${{ matrix.rid }} `
-            -p:LocalSendPackaged=true `
-            -p:GenerateAppxPackageOnBuild=true `
-            -p:AppxPackageSigningEnabled=true `
-            -p:PackageCertificateThumbprint=${{ steps.certificate.outputs.thumbprint }} `
-            -p:AppxPackageDir="$packageDir"
+          $commonArgs = @(
+            '--no-restore',
+            '-c', 'Release',
+            "-p:Platform=$env:PLATFORM",
+            "-p:RuntimeIdentifier=$env:RID",
+            '-p:LocalSendPackaged=true',
+            '-p:GenerateAppxPackageOnBuild=true',
+            '-p:GenerateTestArtifacts=true',
+            '-p:AppxPackageSigningEnabled=true',
+            "-p:PackageCertificateThumbprint=$env:THUMBPRINT",
+            "-p:AppxPackageDir=$packageDir"
+          )
 
-          $package = Get-ChildItem $packageDir -Recurse -Filter *.msix |
-            Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' } |
-            Select-Object -First 1
-          if ($null -eq $package) {
-            throw 'The build completed without producing an MSIX package.'
+          if ($env:AOT -eq 'true') {
+            dotnet publish $env:APP_PROJECT @commonArgs -r $env:RID -p:NativeAot=true
+          } else {
+            dotnet build $env:APP_PROJECT @commonArgs
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Packaging the ${env:PLATFORM}${env:PACKAGE_SUFFIX} MSIX failed."
           }
 
-          $output = Join-Path $env:RUNNER_TEMP "LocalSendDotNet-${{ steps.package.outputs.version }}-${{ matrix.platform }}.msix"
-          Copy-Item $package.FullName $output
+          $packageFolder = Get-ChildItem $packageDir -Directory -Recurse |
+            Where-Object { $_.Name -like '*_Test' } |
+            Select-Object -First 1
+          if ($null -eq $packageFolder) {
+            throw 'The build completed without producing a standard AppPackages Test folder.'
+          }
 
-      - name: Export public signing certificate
-        if: matrix.platform == 'x64'
-        shell: pwsh
-        run: |
-          Export-Certificate `
-            -Cert "Cert:\CurrentUser\My\${{ steps.certificate.outputs.thumbprint }}" `
-            -FilePath (Join-Path $env:RUNNER_TEMP 'LocalSendDotNet-Development.cer') `
-            -Type CERT | Out-Null
-          Copy-Item docs/development-msix-install.md `
-            (Join-Path $env:RUNNER_TEMP 'DEVELOPMENT-MSIX-INSTALL.md')
+          $requiredNames = @('Install.ps1', 'Add-AppDevPackage.ps1')
+          foreach ($requiredName in $requiredNames) {
+            if (-not (Test-Path (Join-Path $packageFolder.FullName $requiredName))) {
+              throw "The package folder is missing $requiredName."
+            }
+          }
+          if (-not (Get-ChildItem $packageFolder.FullName -Filter *.msix)) {
+            throw 'The package folder is missing an MSIX file.'
+          }
+
+          $archive = Join-Path $env:RUNNER_TEMP "LocalSendDotNet-$env:PACKAGE_VERSION-$env:PLATFORM$env:PACKAGE_SUFFIX.zip"
+          Compress-Archive -Path $packageFolder.FullName -DestinationPath $archive -CompressionLevel Optimal
 
       - name: Upload signed package
         uses: actions/upload-artifact@v4
         with:
-          name: signed-msix-${{ matrix.platform }}
-          path: |
-            ${{ runner.temp }}/LocalSendDotNet-${{ steps.package.outputs.version }}-${{ matrix.platform }}.msix
-            ${{ runner.temp }}/LocalSendDotNet-Development.cer
-            ${{ runner.temp }}/DEVELOPMENT-MSIX-INSTALL.md
+          name: signed-msix-${{ matrix.platform }}${{ matrix.package_suffix }}
+          path: ${{ runner.temp }}/LocalSendDotNet-${{ steps.package.outputs.version }}-${{ matrix.platform }}${{ matrix.package_suffix }}.zip
           if-no-files-found: error
 
       - name: Remove signing certificate

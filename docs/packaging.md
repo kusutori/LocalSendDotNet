@@ -89,7 +89,9 @@ does not prevent the `.msix` application package from being created.
 ## GitHub Releases
 
 Pushing a numeric `app-vMAJOR.MINOR.PATCH` tag builds x64 and ARM64 Native AOT
-portable archives and self-signed MSIX packages. The separate prefix avoids
-triggering Core NuGet publication. The public certificate is published beside the
-packages; its private key is supplied only through GitHub Actions Secrets. See
+portable archives plus signed managed and Native AOT MSIX sideload ZIPs, then
+attaches them to the GitHub Release for that tag. Each MSIX ZIP is the standard
+`*_Test` AppPackages folder (`Install.ps1`, `Add-AppDevPackage.ps1`, `.msix`,
+and `.cer`). The separate prefix avoids triggering Core NuGet publication. The
+private key is supplied only through GitHub Actions Secrets. See
 [app-release-ci.md](app-release-ci.md) for setup and release instructions.

@@ -4,12 +4,12 @@ The `App GitHub Release` workflow creates these Windows assets for x64 and ARM64
 
 - a self-contained Native AOT portable ZIP;
 - a separate native-symbols ZIP;
-- a signed managed MSIX sideload ZIP (`LocalSendDotNet-<version>-<platform>.zip`);
-- a signed Native AOT MSIX sideload ZIP (`LocalSendDotNet-<version>-<platform>-aot.zip`).
+- a signed managed MSIX sideload ZIP (`LocalSendDotNet-<version>-<platform>.zip`).
 
-Each MSIX ZIP is the standard `*_Test` AppPackages folder: `Install.ps1`,
-`Add-AppDevPackage.ps1`, the `.msix`, and the matching `.cer`. Unzip it and run
-`Install.ps1`.
+Managed MSIX ZIPs are the standard Visual Studio `*_Test` AppPackages folder
+(`Install.ps1`, `Add-AppDevPackage.ps1`, `.msix`, `.cer`). Native AOT MSIX
+sideload ZIPs are temporarily omitted from GitHub Releases until that packaging
+path is reliable.
 
 The workflow runs for tags in `app-vMAJOR.MINOR.PATCH` or
 `app-vMAJOR.MINOR.PATCH.REVISION` form and can also be started manually. The `app-`

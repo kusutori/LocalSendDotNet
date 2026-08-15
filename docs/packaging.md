@@ -73,26 +73,40 @@ matching private key from `Cert:\CurrentUser\My` (or an exported PFX).
 
 ## Native AOT inside MSIX
 
-Native AOT and MSIX are independent choices. This command publishes an unsigned
-x64 MSIX whose application executable is Native AOT compiled:
+Native AOT and MSIX are independent choices. Do **not** pass
+`LocalSendPackaged=true` together with `NativeAot=true` on the same
+`dotnet publish`: the MSIX targets then package the managed apphost (~600 KB)
+instead of the native executable (~26 MB), and the resulting app white-screens
+and crashes.
+
+Publish the unpackaged Native AOT layout first, copy the stamped
+`Package.appxmanifest` in as `AppxManifest.xml`, then pack and sign with the
+Windows SDK tools (`makeappx` / `signtool`). Do not use `winapp package` for
+this layout.
 
 ```powershell
 dotnet publish src/LocalSendDotNet.App/LocalSendDotNet.App.csproj -c Release `
-  -r win-x64 -p:Platform=x64 `
-  -p:LocalSendPackaged=true -p:NativeAot=true `
-  -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=false
+  -r win-x64 -p:Platform=x64 -p:NativeAot=true `
+  -p:LocalSendPackaged=false -p:WindowsPackageType=None `
+  -o artifacts/publish/native-aot/win-x64
+
+Copy-Item src/LocalSendDotNet.App/Package.appxmanifest `
+  artifacts/publish/native-aot/win-x64/AppxManifest.xml
+
+makeappx pack /o /d artifacts/publish/native-aot/win-x64 `
+  /p artifacts/LocalSendDotNet-win-x64-aot.msix
 ```
 
-The same signing properties described above produce an installable package. A
-missing `mspdbcmf.exe` only prevents generation of the optional symbol package; it
+A missing `mspdbcmf.exe` only prevents generation of the optional symbol package; it
 does not prevent the `.msix` application package from being created.
 
 ## GitHub Releases
 
 Pushing a numeric `app-vMAJOR.MINOR.PATCH` tag builds x64 and ARM64 Native AOT
-portable archives plus signed managed and Native AOT MSIX sideload ZIPs, then
-attaches them to the GitHub Release for that tag. Each MSIX ZIP is the standard
-`*_Test` AppPackages folder (`Install.ps1`, `Add-AppDevPackage.ps1`, `.msix`,
-and `.cer`). The separate prefix avoids triggering Core NuGet publication. The
-private key is supplied only through GitHub Actions Secrets. See
-[app-release-ci.md](app-release-ci.md) for setup and release instructions.
+portable archives plus signed managed MSIX sideload ZIPs, then attaches them to
+the GitHub Release for that tag. Each MSIX ZIP is the standard `*_Test`
+AppPackages folder (`Install.ps1`, `Add-AppDevPackage.ps1`, `.msix`, and
+`.cer`). Native AOT MSIX packages are not published by CI yet. The separate
+prefix avoids triggering Core NuGet publication. The private key is supplied
+only through GitHub Actions Secrets. See [app-release-ci.md](app-release-ci.md)
+for setup and release instructions.

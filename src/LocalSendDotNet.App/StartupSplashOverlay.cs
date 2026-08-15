@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices.WindowsRuntime;
-using CommunityToolkit.WinUI.Lottie;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Xaml;
@@ -37,15 +35,8 @@ sealed class StartupSplashOverlay : Component
         {
             try
             {
-                var path = Path.Combine(AppContext.BaseDirectory, "Assets", "SplashLogo.json");
-                if (File.Exists(path))
-                {
-                    var source = new LottieVisualSource();
-                    player.Source = source;
-                    await using var stream = File.OpenRead(path);
-                    await source.SetSourceAsync(stream.AsRandomAccessStream());
-                    await player.PlayAsync(fromProgress: 0, toProgress: 1, looped: false);
-                }
+                player.Source = new LocalSendDotNet.SplashLogo();
+                await player.PlayAsync(fromProgress: 0, toProgress: 1, looped: false);
             }
             catch
             {

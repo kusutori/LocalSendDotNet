@@ -108,11 +108,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         var (shareTargetPayload, setShareTargetPayload) = UseState<ShareTargetPayload?>(null);
         var nodeRef = UseRef<LocalSendNode?>(null);
         var drainingActivationsRef = UseRef(false);
-        var tray = UseTrayIcon(new TrayIconSpec(
-            AppPlatform.AppWindowIcon,
-            t.Message(new("App", "TrayTooltip")),
-            new WindowKey("main-tray"),
-            settings.MinimizeToTray));
+        var trayIcon = UseRef<WinUIEx.TrayIcon?>(null);
 
         UseEffect(() =>
         {
@@ -142,27 +138,51 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
 
         UseEffect(() =>
         {
-            if (tray is null)
+            ReactorApp.ShutdownPolicy = settings.MinimizeToTray
+                ? ShutdownPolicy.Explicit
+                : ShutdownPolicy.OnLastSurfaceClosed;
+
+            if (!settings.MinimizeToTray)
+            {
+                trayIcon.Current?.Dispose();
+                trayIcon.Current = null;
                 return () => { };
+            }
 
-            void Restore(object? sender, EventArgs e) => RestoreWindow();
-            void ShowMenu(object? sender, EventArgs e) => TrayContextMenu.Show(
-                window?.NativeWindow,
-                t.Message(new("App", "TrayOpen")),
-                RestoreWindow,
-                t.Message(new("App", "TrayExit")),
-                () => ReactorApp.Exit());
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+            if (!File.Exists(iconPath))
+                iconPath = AppPlatform.ExecutablePath;
 
-            tray.Click += Restore;
-            tray.DoubleClick += Restore;
-            tray.RightClick += ShowMenu;
+            var icon = new WinUIEx.TrayIcon(1, iconPath, t.Message(new("App", "TrayTooltip")));
+            icon.Selected += (_, _) => RestoreWindow();
+            icon.LeftDoubleClick += (_, _) => RestoreWindow();
+            icon.ContextMenu += (_, args) =>
+            {
+                var flyout = new MenuFlyout();
+                var open = new MenuFlyoutItem { Text = t.Message(new("App", "TrayOpen")) };
+                open.Click += (_, _) => RestoreWindow();
+                var exit = new MenuFlyoutItem { Text = t.Message(new("App", "TrayExit")) };
+                exit.Click += (_, _) =>
+                {
+                    icon.Dispose();
+                    trayIcon.Current = null;
+                    ReactorApp.Exit();
+                };
+                flyout.Items.Add(open);
+                flyout.Items.Add(new MenuFlyoutSeparator());
+                flyout.Items.Add(exit);
+                args.Flyout = flyout;
+            };
+            icon.IsVisible = true;
+            trayIcon.Current = icon;
+
             return () =>
             {
-                tray.Click -= Restore;
-                tray.DoubleClick -= Restore;
-                tray.RightClick -= ShowMenu;
+                icon.Dispose();
+                if (ReferenceEquals(trayIcon.Current, icon))
+                    trayIcon.Current = null;
             };
-        }, tray, t.Locale, settings.MinimizeToTray);
+        }, settings.MinimizeToTray, t.Locale);
 
         UseEffect(() =>
         {

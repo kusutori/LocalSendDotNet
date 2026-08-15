@@ -82,6 +82,7 @@
         <PackageReference Include="CommunityToolkit.WinUI.Controls.Segmented" />
         <PackageReference Include="Microsoft.WindowsAppSDK" />
         <PackageReference Include="Microsoft.UI.Reactor" />
+        <PackageReference Include="WinUIEx" />
         <ProjectReference Include="..\LocalSendDotNet.Core\LocalSendDotNet.Core.csproj" />
     </ItemGroup>
 

@@ -24,7 +24,7 @@
   </Resources>
 
   <Applications>
-    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
+    <Application Id="App" Executable="LocalSendDotNet.App.exe" EntryPoint="$targetentrypoint$">
       <uap:VisualElements
         DisplayName="LocalSendDotNet"
         Description="Send files and text to nearby LocalSend devices."
@@ -51,7 +51,7 @@
         </uap:Extension>
         <uap5:Extension
           Category="windows.startupTask"
-          Executable="$targetnametoken$.exe"
+          Executable="LocalSendDotNet.App.exe"
           EntryPoint="Windows.FullTrustApplication">
           <uap5:StartupTask
             TaskId="LocalSendStartup"

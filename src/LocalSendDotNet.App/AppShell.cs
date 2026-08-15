@@ -146,10 +146,12 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 return () => { };
 
             void Restore(object? sender, EventArgs e) => RestoreWindow();
-            void ShowMenu(object? sender, EventArgs e) => tray.ShowFlyout(MenuItems(
-                MenuItem(t.Message(new("App", "TrayOpen")), RestoreWindow),
-                MenuSeparator(),
-                MenuItem(t.Message(new("App", "TrayExit")), () => ReactorApp.Exit())));
+            void ShowMenu(object? sender, EventArgs e) => TrayContextMenu.Show(
+                window?.NativeWindow,
+                t.Message(new("App", "TrayOpen")),
+                RestoreWindow,
+                t.Message(new("App", "TrayExit")),
+                () => ReactorApp.Exit());
 
             tray.Click += Restore;
             tray.DoubleClick += Restore;

@@ -81,6 +81,7 @@
         <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
         <PackageReference Include="CommunityToolkit.WinUI.Controls.Segmented" />
         <PackageReference Include="CommunityToolkit.WinUI.Lottie" />
+        <PackageReference Include="Microsoft.Graphics.Win2D" />
         <PackageReference Include="Microsoft.WindowsAppSDK" />
         <PackageReference Include="Microsoft.UI.Reactor" />
         <PackageReference Include="WinUIEx" />

@@ -19,8 +19,35 @@ sealed class AppShell : Component
 
     public override Element Render()
     {
-        var (settings, updateSettings) = UseReducer(AppSettings.Default);
+        var (settings, updateSettings) = UseReducer(AppSettingsStore.Load());
         var window = UseWindow();
+
+        UseEffect(() => AppSettingsStore.Save(settings), settings);
+        UseEffect(() =>
+        {
+            if (settings.StartWithWindows)
+                WindowsStartup.UpdateLaunchCommand(settings.MinimizeToTray);
+        }, settings.StartWithWindows, settings.MinimizeToTray);
+        UseEffect(() =>
+        {
+            var cts = new CancellationTokenSource();
+            _ = SyncStartupAsync(cts.Token);
+            return () => cts.Cancel();
+
+            async Task SyncStartupAsync(CancellationToken cancellationToken)
+            {
+                try
+                {
+                    var enabled = await WindowsStartup.IsEnabledAsync().ConfigureAwait(true);
+                    if (cancellationToken.IsCancellationRequested || enabled == settings.StartWithWindows)
+                        return;
+                    updateSettings(current => current with { StartWithWindows = enabled });
+                }
+                catch
+                {
+                }
+            }
+        });
 
         UseEffect(() =>
         {
@@ -81,6 +108,11 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         var (shareTargetPayload, setShareTargetPayload) = UseState<ShareTargetPayload?>(null);
         var nodeRef = UseRef<LocalSendNode?>(null);
         var drainingActivationsRef = UseRef(false);
+        var tray = UseTrayIcon(new TrayIconSpec(
+            AppPlatform.AppWindowIcon,
+            t.Message(new("App", "TrayTooltip")),
+            new WindowKey("main-tray"),
+            settings.MinimizeToTray));
 
         UseEffect(() =>
         {
@@ -89,6 +121,52 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             ScheduleActivationDrain();
             return () => ShareTargetActivationBroker.ActivationReceived -= activationReceived;
         });
+
+        UseEffect(() =>
+        {
+            if (window is null)
+                return () => { };
+
+            void OnClosing(object? sender, WindowClosingEventArgs args)
+            {
+                if (args.Reason != WindowCloseReason.UserClosed || !settings.MinimizeToTray)
+                    return;
+
+                args.Cancel = true;
+                HideToTray();
+            }
+
+            window.Closing += OnClosing;
+            return () => window.Closing -= OnClosing;
+        }, window, settings.MinimizeToTray);
+
+        UseEffect(() =>
+        {
+            if (tray is null)
+                return () => { };
+
+            void Restore(object? sender, EventArgs e) => RestoreWindow();
+            void ShowMenu(object? sender, EventArgs e) => tray.ShowFlyout(MenuItems(
+                MenuItem(t.Message(new("App", "TrayOpen")), RestoreWindow),
+                MenuSeparator(),
+                MenuItem(t.Message(new("App", "TrayExit")), () => ReactorApp.Exit())));
+
+            tray.Click += Restore;
+            tray.DoubleClick += Restore;
+            tray.RightClick += ShowMenu;
+            return () =>
+            {
+                tray.Click -= Restore;
+                tray.DoubleClick -= Restore;
+                tray.RightClick -= ShowMenu;
+            };
+        }, tray, t.Locale, settings.MinimizeToTray);
+
+        UseEffect(() =>
+        {
+            if (runtime.IncomingTransfers.Count > 0)
+                RestoreWindow();
+        }, runtime.IncomingTransfers.Count);
 
         UseEffect(() =>
         {
@@ -184,6 +262,27 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
 
         return root;
 
+        void RestoreWindow()
+        {
+            if (window is null)
+                return;
+
+            if (!window.Spec.ShowInTaskbar)
+                window.Update(window.Spec with { ShowInTaskbar = true });
+            window.Show();
+            window.Activate();
+        }
+
+        void HideToTray()
+        {
+            if (window is null)
+                return;
+
+            window.Hide();
+            if (window.Spec.ShowInTaskbar)
+                window.Update(window.Spec with { ShowInTaskbar = false });
+        }
+
         void DismissIncoming(Guid requestId)
         {
             updateRuntime(current => current with
@@ -222,7 +321,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             {
                 while (ShareTargetActivationBroker.TryDequeue(out var activation))
                 {
-                    window?.Activate();
+                    RestoreWindow();
                     if (activation?.Kind != ExtendedActivationKind.ShareTarget
                         || activation.Data is not ShareTargetActivatedEventArgs shareArgs)
                     {
@@ -252,7 +351,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 setShareTargetPayload(payload);
                 if (navigation.CurrentRoute != AppRoute.Send)
                     navigation.Navigate(AppRoute.Send);
-                window?.Activate();
+                RestoreWindow();
                 operation.ReportCompleted();
             }
             catch (Exception exception)
@@ -272,9 +371,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
 
         async Task RunNodeAsync(CancellationToken cancellationToken)
         {
-            var dataDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LocalSendDotNet");
+            var dataDirectory = AppPlatform.DataDirectory;
             var node = new LocalSendNode(new LocalSendOptions
             {
                 Alias = settings.Alias,

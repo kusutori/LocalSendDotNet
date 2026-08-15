@@ -1,7 +1,5 @@
 using System.Collections.Concurrent;
-using System.Runtime.InteropServices;
 using Microsoft.Windows.AppLifecycle;
-using Package = Windows.ApplicationModel.Package;
 
 static class ShareTargetActivationBroker
 {
@@ -14,7 +12,7 @@ static class ShareTargetActivationBroker
 
     public static async Task<bool> RedirectToPrimaryInstanceAsync()
     {
-        if (!HasPackageIdentity())
+        if (!AppPlatform.HasPackageIdentity())
             return false;
 
         var current = AppInstance.GetCurrent();
@@ -40,22 +38,5 @@ static class ShareTargetActivationBroker
     {
         PendingActivations.Enqueue(activation);
         ActivationReceived?.Invoke(null, EventArgs.Empty);
-    }
-
-    private static bool HasPackageIdentity()
-    {
-        try
-        {
-            _ = Package.Current.Id.Name;
-            return true;
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
-        catch (COMException)
-        {
-            return false;
-        }
     }
 }

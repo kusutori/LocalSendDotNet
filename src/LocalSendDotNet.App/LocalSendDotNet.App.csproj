@@ -93,6 +93,7 @@
               CopyToPublishDirectory="PreserveNewest"
               Link="Strings\%(RecursiveDir)%(Filename)%(Extension)" />
         <Content Include="Assets\AppIcon.svg" CopyToOutputDirectory="PreserveNewest" />
+        <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(LocalSendPackaged)' == 'true'">

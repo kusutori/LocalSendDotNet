@@ -3,6 +3,8 @@ using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Controls;
+using Windows.Storage.Pickers;
 using static Microsoft.UI.Reactor.Factories;
 using static LocalSendDotNet.App.Controls.Toolkit.SettingsCardElement;
 
@@ -15,6 +17,8 @@ sealed class SettingsPage : Component<SettingsPageProps>
     public override Element Render()
     {
         var t = UseIntl();
+        var window = UseWindow();
+        var (statusMessage, setStatusMessage) = UseState<string?>(null);
         string[] themeOptions =
         [
             t.Message(new("App", "OptionSystem")),
@@ -69,7 +73,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 isActionIconVisible: false,
                 content:
                 ToggleSwitch(Props.Settings.StartWithWindows, value =>
-                    Props.UpdateSettings(settings => settings with { StartWithWindows = value }))),
+                    _ = SetStartupAsync(value))),
             SettingsCard(
                 header: t.Message(new("App", "SettingsAnimations")),
                 description: t.Message(new("App", "SettingsAnimationsDescription")),
@@ -117,18 +121,76 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 isClickEnabled: false,
                 isActionIconVisible: false,
                 content:
-                Button(t.Message(new("App", "Change")), () => { })
+                Button(t.Message(new("App", "Change")), () => _ = PickDownloadDirectoryAsync())
                     .AutomationName(t.Message(new("App", "ChangeSaveLocation")))));
 
         return ScrollView(
             VStack(24,
                 Heading(t.Message(new("App", "SettingsTitle")))
                     .HeadingLevel(AutomationHeadingLevel.Level1),
+                statusMessage is null
+                    ? null
+                    : (InfoBar(t.Message(new("App", "SettingsTitle")), statusMessage) with
+                    {
+                        IsOpen = true,
+                        IsClosable = true,
+                        OnClosed = () => setStatusMessage(null),
+                    }).Severity(InfoBarSeverity.Error),
                 generalCards,
                 receiveCards)
             .Padding(36))
             .HorizontalContentAlignment(HorizontalAlignment.Stretch)
             .Landmark(AutomationLandmarkType.Main);
+
+        async Task SetStartupAsync(bool enabled)
+        {
+            try
+            {
+                await WindowsStartup.SetEnabledAsync(enabled, Props.Settings.MinimizeToTray);
+                Props.UpdateSettings(settings => settings with { StartWithWindows = enabled });
+                setStatusMessage(null);
+            }
+            catch (StartupDisabledException exception)
+            {
+                setStatusMessage(t.Message(new("App", exception.ResourceKey)));
+            }
+            catch (Exception exception)
+            {
+                setStatusMessage(t.Message(
+                    new("App", "StartupFailed"),
+                    ("error", exception.Message)));
+            }
+        }
+
+        async Task PickDownloadDirectoryAsync()
+        {
+            try
+            {
+                var picker = new FolderPicker
+                {
+                    SuggestedStartLocation = PickerLocationId.Downloads,
+                    CommitButtonText = t.Message(new("App", "Change")),
+                };
+                picker.FileTypeFilter.Add("*");
+                var nativeWindow = window?.NativeWindow
+                    ?? throw new InvalidOperationException(t.Message(new("App", "WindowUnavailable")));
+                WinRT.Interop.InitializeWithWindow.Initialize(
+                    picker,
+                    WinRT.Interop.WindowNative.GetWindowHandle(nativeWindow));
+                var folder = await picker.PickSingleFolderAsync();
+                if (folder is null)
+                    return;
+
+                Props.UpdateSettings(settings => settings with { DownloadDirectory = folder.Path });
+                setStatusMessage(null);
+            }
+            catch (Exception exception)
+            {
+                setStatusMessage(t.Message(
+                    new("App", "PickFolderFailed"),
+                    ("error", exception.Message)));
+            }
+        }
     }
 
     private static Element SettingsGroup(string title, params Element[] cards) =>

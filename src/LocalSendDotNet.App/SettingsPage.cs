@@ -1,3 +1,4 @@
+using CommunityToolkit.WinUI.Controls;
 using LocalSendDotNet;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
@@ -9,6 +10,7 @@ using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
 using static Microsoft.UI.Reactor.Factories;
 using static LocalSendDotNet.App.Controls.Toolkit.SettingsCardElement;
+using static LocalSendDotNet.App.Controls.Toolkit.SettingsExpanderElement;
 
 sealed record SettingsPageProps(
     AppSettings Settings,
@@ -287,6 +289,52 @@ sealed class SettingsPage : Component<SettingsPageProps>
                     .AutomationName(t.Message(new("App", "SettingsMulticast")))
                     .MinWidth(180)));
 
+        var version = typeof(SettingsPage).Assembly.GetName().Version is { } assemblyVersion
+            ? $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}"
+            : "0.1.5";
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+        var aboutLinks = VStack(0,
+            HyperlinkButton(
+                t.Message(new("App", "SettingsAboutGitHub")),
+                new Uri("https://github.com/kusutori/LocalSendDotNet")),
+            HyperlinkButton(
+                t.Message(new("App", "SettingsAboutLocalSend")),
+                new Uri("https://localsend.org")),
+            HyperlinkButton(
+                t.Message(new("App", "SettingsAboutIssues")),
+                new Uri("https://github.com/kusutori/LocalSendDotNet/issues")));
+        var aboutSection = VStack(4,
+            Subtitle(t.Message(new("App", "SettingsAbout")))
+                .HeadingLevel(AutomationHeadingLevel.Level2)
+                .Margin(bottom: 8),
+            SettingsExpander(
+                headerIcon: Icon(ImageIcon(new Uri(iconPath, UriKind.Absolute))),
+                items:
+                [
+                    SettingsCard(
+                        contentAlignment: ContentAlignment.Left,
+                        isClickEnabled: false,
+                        isActionIconVisible: false,
+                        content: aboutLinks)
+                        .HAlign(HorizontalAlignment.Stretch),
+                ])
+                .Set(expander =>
+                {
+                    expander.Header = "LocalSend";
+                    expander.Description = t.Message(
+                        new("App", "SettingsAboutCopyright"),
+                        ("year", DateTime.Now.Year));
+                    expander.Content = t.Message(
+                        new("App", "SettingsAboutVersion"),
+                        ("version", version));
+                })
+                .HAlign(HorizontalAlignment.Stretch),
+            HyperlinkButton(
+                t.Message(new("App", "SettingsAboutFeedback")),
+                new Uri("https://github.com/kusutori/LocalSendDotNet/issues"))
+                .HAlign(HorizontalAlignment.Left)
+                .Margin(top: 8));
+
         return ScrollView(
             VStack(24,
                 Heading(t.Message(new("App", "SettingsTitle")))
@@ -316,6 +364,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 generalCards,
                 receiveCards,
                 networkCards,
+                aboutSection,
                 ContentDialog(
                     t.Message(new("App", "SettingsEncryptionDisabledTitle")),
                     TextBlock(t.Message(new("App", "SettingsEncryptionDisabledNotice")))

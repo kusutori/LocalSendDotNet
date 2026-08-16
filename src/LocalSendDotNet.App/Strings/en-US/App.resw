@@ -143,6 +143,13 @@
   <data name="SendTitle" xml:space="preserve"><value>Send</value></data>
   <data name="SendToDevice" xml:space="preserve"><value>Send to {device}</value></data>
   <data name="SentToDevice" xml:space="preserve"><value>Successfully sent to {device}.</value></data>
+  <data name="SettingsAbout" xml:space="preserve"><value>About</value></data>
+  <data name="SettingsAboutCopyright" xml:space="preserve"><value>© {year}. All rights reserved.</value></data>
+  <data name="SettingsAboutFeedback" xml:space="preserve"><value>Send feedback</value></data>
+  <data name="SettingsAboutGitHub" xml:space="preserve"><value>GitHub repository</value></data>
+  <data name="SettingsAboutIssues" xml:space="preserve"><value>Report an issue</value></data>
+  <data name="SettingsAboutLocalSend" xml:space="preserve"><value>LocalSend website</value></data>
+  <data name="SettingsAboutVersion" xml:space="preserve"><value>Version {version}</value></data>
   <data name="SettingsAnimations" xml:space="preserve"><value>Animations</value></data>
   <data name="SettingsAnimationsDescription" xml:space="preserve"><value>Enable page transitions and status animations.</value></data>
   <data name="SettingsAutoSave" xml:space="preserve"><value>Auto save</value></data>

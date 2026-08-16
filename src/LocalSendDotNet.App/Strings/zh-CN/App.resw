@@ -143,6 +143,8 @@
   <data name="SendTitle" xml:space="preserve"><value>发送</value></data>
   <data name="SendToDevice" xml:space="preserve"><value>向 {device} 发送</value></data>
   <data name="SentToDevice" xml:space="preserve"><value>已成功发送给 {device}。</value></data>
+  <data name="SettingsAdvanced" xml:space="preserve"><value>高级设置</value></data>
+  <data name="SettingsAdvancedDescription" xml:space="preserve"><value>设备类型、端口、加密等网络选项。</value></data>
   <data name="SettingsAbout" xml:space="preserve"><value>关于</value></data>
   <data name="SettingsAboutCopyright" xml:space="preserve"><value>© {year}。保留所有权利。</value></data>
   <data name="SettingsAboutFeedback" xml:space="preserve"><value>发送反馈</value></data>

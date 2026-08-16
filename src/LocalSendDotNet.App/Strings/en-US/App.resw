@@ -143,6 +143,8 @@
   <data name="SendTitle" xml:space="preserve"><value>Send</value></data>
   <data name="SendToDevice" xml:space="preserve"><value>Send to {device}</value></data>
   <data name="SentToDevice" xml:space="preserve"><value>Successfully sent to {device}.</value></data>
+  <data name="SettingsAdvanced" xml:space="preserve"><value>Advanced settings</value></data>
+  <data name="SettingsAdvancedDescription" xml:space="preserve"><value>Device type, port, encryption, and other network options.</value></data>
   <data name="SettingsAbout" xml:space="preserve"><value>About</value></data>
   <data name="SettingsAboutCopyright" xml:space="preserve"><value>© {year}. All rights reserved.</value></data>
   <data name="SettingsAboutFeedback" xml:space="preserve"><value>Send feedback</value></data>

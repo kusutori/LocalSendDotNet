@@ -194,100 +194,111 @@ sealed class SettingsPage : Component<SettingsPageProps>
                     Props.UpdateSettings(settings => settings with { Alias = value }))
                     .AutomationName(t.Message(new("App", "SettingsDeviceName")))
                     .MinWidth(240)),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsDeviceType")),
-                description: t.Message(new("App", "SettingsDeviceTypeDescription")),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                ComboBox(deviceTypeOptions, DeviceTypeIndex(Props.Settings.DeviceType), index =>
+            SettingsExpander(
+                items:
+                [
+                    SettingsCard(
+                        header: t.Message(new("App", "SettingsDeviceType")),
+                        description: t.Message(new("App", "SettingsDeviceTypeDescription")),
+                        isClickEnabled: false,
+                        isActionIconVisible: false,
+                        content:
+                        ComboBox(deviceTypeOptions, DeviceTypeIndex(Props.Settings.DeviceType), index =>
+                        {
+                            var type = DeviceTypeFromIndex(index);
+                            if (type != Props.Settings.DeviceType)
+                                Props.UpdateSettings(settings => settings with { DeviceType = type });
+                        })
+                            .MinWidth(180)),
+                    SettingsCard(
+                        header: t.Message(new("App", "SettingsDeviceModel")),
+                        description: t.Message(new("App", "SettingsDeviceModelDescription")),
+                        isClickEnabled: false,
+                        isActionIconVisible: false,
+                        content:
+                        TextBox(
+                            Props.Settings.DeviceModel,
+                            value => Props.UpdateSettings(settings => settings with { DeviceModel = value }),
+                            placeholderText: Environment.MachineName)
+                            .AutomationName(t.Message(new("App", "SettingsDeviceModel")))
+                            .MinWidth(240)),
+                    SettingsCard(
+                        header: t.Message(new("App", "SettingsPort")),
+                        description: Props.Settings.Port == LocalSendOptions.DefaultPort
+                            ? t.Message(new("App", "SettingsPortDescription"))
+                            : t.Message(new("App", "SettingsPortWarning"), ("port", LocalSendOptions.DefaultPort)),
+                        isClickEnabled: false,
+                        isActionIconVisible: false,
+                        content:
+                        NumberBox(Props.Settings.Port, value =>
+                        {
+                            var port = (int)Math.Round(value);
+                            if (port is >= 1 and <= ushort.MaxValue && port != Props.Settings.Port)
+                                Props.UpdateSettings(settings => settings with { Port = port });
+                        })
+                            .Range(1, ushort.MaxValue)
+                            .SpinButtons()
+                            .AutomationName(t.Message(new("App", "SettingsPort")))
+                            .MinWidth(160)),
+                    SettingsCard(
+                        header: t.Message(new("App", "SettingsNetworkInterfaces")),
+                        description: t.Message(new("App", "SettingsNetworkInterfacesAll")),
+                        isClickEnabled: false,
+                        isActionIconVisible: false,
+                        content:
+                        Button(t.Message(new("App", "Change")), () => navigation.Navigate(AppRoute.NetworkInterfaces))
+                            .AutomationName(t.Message(new("App", "SettingsNetworkInterfaces")))),
+                    SettingsCard(
+                        header: t.Message(new("App", "SettingsDiscoveryTimeout")),
+                        description: t.Message(new("App", "SettingsDiscoveryTimeoutDescription")),
+                        isClickEnabled: false,
+                        isActionIconVisible: false,
+                        content:
+                        NumberBox(Props.Settings.DiscoveryTimeoutMs, value =>
+                        {
+                            var timeout = (int)Math.Round(value);
+                            if (timeout > 0 && timeout != Props.Settings.DiscoveryTimeoutMs)
+                                Props.UpdateSettings(settings => settings with { DiscoveryTimeoutMs = timeout });
+                        })
+                            .Range(1, 60_000)
+                            .SpinButtons()
+                            .AutomationName(t.Message(new("App", "SettingsDiscoveryTimeout")))
+                            .MinWidth(160)),
+                    SettingsCard(
+                        header: t.Message(new("App", "SettingsEncryption")),
+                        description: t.Message(new("App", "SettingsEncryptionDescription")),
+                        isClickEnabled: false,
+                        isActionIconVisible: false,
+                        content:
+                        ToggleSwitch(Props.Settings.EnableHttps, value =>
+                        {
+                            Props.UpdateSettings(settings => settings with { EnableHttps = value });
+                            if (!value)
+                                setEncryptionNoticeOpen(true);
+                        })),
+                    SettingsCard(
+                        header: t.Message(new("App", "SettingsMulticast")),
+                        description: string.Equals(
+                                Props.Settings.ResolvedMulticastAddress.ToString(),
+                                LocalSendOptions.DefaultMulticastAddress.ToString(),
+                                StringComparison.Ordinal)
+                            ? t.Message(new("App", "SettingsMulticastDescription"))
+                            : t.Message(
+                                new("App", "SettingsMulticastWarning"),
+                                ("group", LocalSendOptions.DefaultMulticastAddress)),
+                        isClickEnabled: false,
+                        isActionIconVisible: false,
+                        content:
+                        TextBox(Props.Settings.MulticastGroup, value =>
+                            Props.UpdateSettings(settings => settings with { MulticastGroup = value }))
+                            .AutomationName(t.Message(new("App", "SettingsMulticast")))
+                            .MinWidth(180)),
+                ])
+                .Set(expander =>
                 {
-                    var type = DeviceTypeFromIndex(index);
-                    if (type != Props.Settings.DeviceType)
-                        Props.UpdateSettings(settings => settings with { DeviceType = type });
-                })
-                    .MinWidth(180)),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsDeviceModel")),
-                description: t.Message(new("App", "SettingsDeviceModelDescription")),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                TextBox(
-                    Props.Settings.DeviceModel,
-                    value => Props.UpdateSettings(settings => settings with { DeviceModel = value }),
-                    placeholderText: Environment.MachineName)
-                    .AutomationName(t.Message(new("App", "SettingsDeviceModel")))
-                    .MinWidth(240)),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsPort")),
-                description: Props.Settings.Port == LocalSendOptions.DefaultPort
-                    ? t.Message(new("App", "SettingsPortDescription"))
-                    : t.Message(new("App", "SettingsPortWarning"), ("port", LocalSendOptions.DefaultPort)),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                NumberBox(Props.Settings.Port, value =>
-                {
-                    var port = (int)Math.Round(value);
-                    if (port is >= 1 and <= ushort.MaxValue && port != Props.Settings.Port)
-                        Props.UpdateSettings(settings => settings with { Port = port });
-                })
-                    .Range(1, ushort.MaxValue)
-                    .AutomationName(t.Message(new("App", "SettingsPort")))
-                    .MinWidth(140)),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsNetworkInterfaces")),
-                description: t.Message(new("App", "SettingsNetworkInterfacesAll")),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                Button(t.Message(new("App", "Change")), () => navigation.Navigate(AppRoute.NetworkInterfaces))
-                    .AutomationName(t.Message(new("App", "SettingsNetworkInterfaces")))),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsDiscoveryTimeout")),
-                description: t.Message(new("App", "SettingsDiscoveryTimeoutDescription")),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                NumberBox(Props.Settings.DiscoveryTimeoutMs, value =>
-                {
-                    var timeout = (int)Math.Round(value);
-                    if (timeout > 0 && timeout != Props.Settings.DiscoveryTimeoutMs)
-                        Props.UpdateSettings(settings => settings with { DiscoveryTimeoutMs = timeout });
-                })
-                    .Range(1, 60_000)
-                    .AutomationName(t.Message(new("App", "SettingsDiscoveryTimeout")))
-                    .MinWidth(140)),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsEncryption")),
-                description: t.Message(new("App", "SettingsEncryptionDescription")),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                ToggleSwitch(Props.Settings.EnableHttps, value =>
-                {
-                    Props.UpdateSettings(settings => settings with { EnableHttps = value });
-                    if (!value)
-                        setEncryptionNoticeOpen(true);
-                })),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsMulticast")),
-                description: string.Equals(
-                        Props.Settings.ResolvedMulticastAddress.ToString(),
-                        LocalSendOptions.DefaultMulticastAddress.ToString(),
-                        StringComparison.Ordinal)
-                    ? t.Message(new("App", "SettingsMulticastDescription"))
-                    : t.Message(
-                        new("App", "SettingsMulticastWarning"),
-                        ("group", LocalSendOptions.DefaultMulticastAddress)),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                TextBox(Props.Settings.MulticastGroup, value =>
-                    Props.UpdateSettings(settings => settings with { MulticastGroup = value }))
-                    .AutomationName(t.Message(new("App", "SettingsMulticast")))
-                    .MinWidth(180)));
+                    expander.Header = t.Message(new("App", "SettingsAdvanced"));
+                    expander.Description = t.Message(new("App", "SettingsAdvancedDescription"));
+                }));
 
         var version = typeof(SettingsPage).Assembly.GetName().Version is { } assemblyVersion
             ? $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}"

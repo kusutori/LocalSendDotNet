@@ -41,7 +41,19 @@ the imported certificate after packaging.
 
 ## Publishing
 
-After the workflow and Secrets are present on the default branch, publish with:
+Commit the feature work first so the working tree is clean, then from the
+repository root:
+
+```powershell
+./tools/Publish-Release.ps1
+```
+
+That bumps the app patch version in `LocalSendDotNet.App.csproj` and
+`Package.appxmanifest`, commits `Ship <version>`, and pushes `app-vMAJOR.MINOR.PATCH`.
+Use `-Bump Minor` or `-Version 0.2.0` to choose the next number, `-DryRun` to
+preview, and `-NoPush` to stop after the local commit and tag.
+
+Manual equivalent after the version files already match:
 
 ```powershell
 git tag -a app-v0.1.0 -m "Application release app-v0.1.0"

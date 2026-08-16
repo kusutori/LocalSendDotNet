@@ -43,7 +43,13 @@ The package version is the `<Version>` value in
 2. Push the release commit and wait for the normal `ci` workflow to pass.
 3. Run `publish-nuget` manually once and inspect the downloaded `.nupkg` and
    `.snupkg` artifacts.
-4. Create and push a matching tag. For version `0.2.0-preview.2`:
+4. Create and push a matching tag. After the changelog heading exists:
+
+   ```powershell
+   ./tools/Publish-Release.ps1 -Project Core -Version 0.2.0-preview.2
+   ```
+
+   Manual equivalent:
 
    ```powershell
    git tag -a v0.2.0-preview.2 -m "LocalSendDotNet.Core 0.2.0-preview.2"

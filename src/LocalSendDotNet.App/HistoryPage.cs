@@ -2,7 +2,6 @@ using System.Diagnostics;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
-using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
@@ -17,7 +16,6 @@ sealed class HistoryPage : Component<HistoryPageProps>
     public override Element Render()
     {
         var t = UseIntl();
-        var navigation = UseNavigation<AppRoute>();
         var entries = UseExternalStore<IReadOnlyList<ReceiveHistoryEntry>>(
             listener =>
             {
@@ -28,19 +26,8 @@ sealed class HistoryPage : Component<HistoryPageProps>
         var (infoEntry, setInfoEntry) = UseState<ReceiveHistoryEntry?>(null);
         var (confirmClear, setConfirmClear) = UseState(false);
 
-        var header = FlexRow(
-                navigation.CanGoBack
-                    ? Button(Icon(FontIcon("\uE72B")), () => navigation.GoBack())
-                        .SubtleButton()
-                        .AutomationName(t.Message(new("App", "HistoryBack")))
-                        .MinWidth(40)
-                        .MinHeight(40)
-                    : null,
-                Heading(t.Message(new("App", "HistoryTitle")))
-                    .HeadingLevel(AutomationHeadingLevel.Level1)
-                    .Flex(grow: 1, basis: 0))
-            with
-        { AlignItems = FlexAlign.Center, ColumnGap = 8 };
+        var header = Heading(t.Message(new("App", "HistoryTitle")))
+            .HeadingLevel(AutomationHeadingLevel.Level1);
 
         var actions = FlexRow(
                 Button(t.Message(new("App", "HistoryOpenDirectory")), OpenDownloadDirectory)

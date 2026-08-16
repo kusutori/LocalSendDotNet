@@ -1,4 +1,5 @@
 using LocalSendDotNet;
+using Microsoft.UI.Input;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Localization;
@@ -6,6 +7,7 @@ using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using static Microsoft.UI.Reactor.Factories;
 using Windows.System.UserProfile;
 
@@ -124,6 +126,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         var nodeLifecycle = nodeLifecycleRef.Current ??= new SemaphoreSlim(1, 1);
         var nextNodeSession = UseRef(0);
         var ownerNodeSession = UseRef(0);
+        var mouseBackHandler = UseRef<PointerEventHandler?>(null);
 
         UseEffect(() =>
         {
@@ -239,6 +242,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                         ? Theme.SystemCaution
                         : Theme.SecondaryText),
         })
+        .WithNavigation(navigation)
         .Tall()
         .Icon(ImageIcon(new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"), UriKind.Absolute)))
         .Flex(shrink: 0);
@@ -319,7 +323,31 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 transferOverlay?.Grid(row: 0, column: 0))
             .Flex(grow: 1, basis: 0);
 
-        var root = FlexColumn(titleBar, contentLayer);
+        var root = FlexColumn(titleBar, contentLayer)
+            .OnMountAdd(element =>
+            {
+                void OnPointerPressed(object sender, PointerRoutedEventArgs e)
+                {
+                    if (e.GetCurrentPoint(element).Properties.PointerUpdateKind
+                        != PointerUpdateKind.XButton1Pressed)
+                        return;
+
+                    if (!navigation.CanGoBack)
+                        return;
+
+                    e.Handled = true;
+                    navigation.GoBack();
+                }
+
+                PointerEventHandler handler = OnPointerPressed;
+                mouseBackHandler.Current = handler;
+                element.AddHandler(UIElement.PointerPressedEvent, handler, handledEventsToo: true);
+            })
+            .OnUnmountAdd(element =>
+            {
+                if (mouseBackHandler.Current is { } handler)
+                    element.RemoveHandler(UIElement.PointerPressedEvent, handler);
+            });
 
         return root;
 

@@ -106,7 +106,8 @@ sealed class ReceivePage : Component<ReceivePageProps>
                             .AutomationName(t.Message(new("App", "HistoryOpenReceiveHistory")))
                             .MinWidth(40)
                             .MinHeight(40))
-                    with { AlignItems = FlexAlign.Center, ColumnGap = 8 },
+                    with
+                { AlignItems = FlexAlign.Center, ColumnGap = 8 },
                 identityPanel.Flex(grow: 1, basis: 0),
                 autoSave) with
             {

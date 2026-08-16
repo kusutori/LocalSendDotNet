@@ -39,7 +39,8 @@ sealed class HistoryPage : Component<HistoryPageProps>
                 Heading(t.Message(new("App", "HistoryTitle")))
                     .HeadingLevel(AutomationHeadingLevel.Level1)
                     .Flex(grow: 1, basis: 0))
-            with { AlignItems = FlexAlign.Center, ColumnGap = 8 };
+            with
+        { AlignItems = FlexAlign.Center, ColumnGap = 8 };
 
         var actions = FlexRow(
                 Button(t.Message(new("App", "HistoryOpenDirectory")), OpenDownloadDirectory)
@@ -52,7 +53,8 @@ sealed class HistoryPage : Component<HistoryPageProps>
                         .Set("ButtonForegroundPointerOver", Theme.SystemCritical)
                         .Set("ButtonForegroundPressed", Theme.SystemCritical)
                         .Set("ButtonForegroundDisabled", Theme.DisabledText)))
-            with { ColumnGap = 8, Wrap = FlexWrap.Wrap };
+            with
+        { ColumnGap = 8, Wrap = FlexWrap.Wrap };
 
         Element list = entries.Count == 0
             ? Caption(t.Message(new("App", "HistoryEmpty")))
@@ -91,7 +93,8 @@ sealed class HistoryPage : Component<HistoryPageProps>
                         IsOpen = infoEntry is not null,
                         DefaultButton = ContentDialogButton.Close,
                         OnClosed = _ => setInfoEntry(null),
-                    }) with { RowGap = 20 }))
+                    }) with
+                { RowGap = 20 }))
             .Padding(36)
             .Landmark(AutomationLandmarkType.Main);
 

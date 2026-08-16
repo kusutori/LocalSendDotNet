@@ -26,7 +26,8 @@ sealed class NetworkInterfacesPage : Component
                             Heading(t.Message(new("App", "SettingsNetworkInterfaces")))
                                 .HeadingLevel(AutomationHeadingLevel.Level1)
                                 .Flex(grow: 1, basis: 0))
-                        with { AlignItems = FlexAlign.Center, ColumnGap = 8 },
+                        with
+                    { AlignItems = FlexAlign.Center, ColumnGap = 8 },
                     TextBlock(t.Message(new("App", "SettingsNetworkInterfacesPlaceholder")))
                         .Foreground(Theme.SecondaryText)
                         .TextWrapping(TextWrapping.WrapWholeWords)) with

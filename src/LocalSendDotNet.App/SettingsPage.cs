@@ -302,7 +302,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
 
         var version = typeof(SettingsPage).Assembly.GetName().Version is { } assemblyVersion
             ? $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}"
-            : "0.1.5";
+            : "0.1.6";
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
         var aboutLinks = VStack(0,
             HyperlinkButton(

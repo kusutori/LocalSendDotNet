@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-preview.3
+
+- Keep the HTTP server running when multicast UDP cannot bind, for example on Windows excluded-port ranges.
+- Expose `DiscoveryError` and `DiscoveryTimeout` so hosts can show a degraded-discovery warning and bound HTTP probes.
+- Scan local `/24` subnets over HTTP when multicast is unavailable; `RefreshAsync` retries multicast and scans as needed.
+
 ## 0.2.0-preview.2
 
 - Recover IPv4 multicast discovery after network-interface changes and socket failures.

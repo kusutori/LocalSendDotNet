@@ -2,6 +2,7 @@ using LocalSendDotNet;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
+using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
@@ -22,14 +23,33 @@ sealed class SettingsPage : Component<SettingsPageProps>
     {
         var t = UseIntl();
         var window = UseWindow();
+        var navigation = UseNavigation<AppRoute>();
         var (statusMessage, setStatusMessage) = UseState<string?>(null);
+        var (encryptionNoticeOpen, setEncryptionNoticeOpen) = UseState(false);
         var nodeState = Props.Runtime.NodeState;
         var serverBusy = nodeState is LocalSendNodeState.Starting or LocalSendNodeState.Stopping;
         var serverRunning = nodeState == LocalSendNodeState.Running;
         var serverOnline = nodeState is LocalSendNodeState.Running or LocalSendNodeState.Starting;
         var needsRestart = serverRunning
             && Props.Runtime.Identity is { } identity
-            && !string.Equals(identity.Alias, Props.Settings.ResolvedAlias, StringComparison.Ordinal);
+            && (
+                !string.Equals(identity.Alias, Props.Settings.ResolvedAlias, StringComparison.Ordinal)
+                || identity.DeviceType != Props.Settings.DeviceType
+                || !string.Equals(identity.DeviceModel ?? "", Props.Settings.ResolvedDeviceModel, StringComparison.Ordinal)
+                || identity.Port != Props.Settings.Port
+                || (identity.Protocol == LocalSendProtocol.Https) != Props.Settings.EnableHttps
+                || !string.Equals(
+                    Props.Runtime.AppliedMulticastGroup,
+                    Props.Settings.ResolvedMulticastAddress.ToString(),
+                    StringComparison.Ordinal));
+        var deviceTypeOptions = new[]
+        {
+            t.Message(new("App", "DeviceDesktop")),
+            t.Message(new("App", "DeviceMobile")),
+            t.Message(new("App", "DeviceWeb")),
+            t.Message(new("App", "DeviceHeadless")),
+            t.Message(new("App", "DeviceServer")),
+        };
         string[] themeOptions =
         [
             t.Message(new("App", "OptionSystem")),
@@ -171,7 +191,101 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 TextBox(Props.Settings.Alias, value =>
                     Props.UpdateSettings(settings => settings with { Alias = value }))
                     .AutomationName(t.Message(new("App", "SettingsDeviceName")))
-                    .MinWidth(240)));
+                    .MinWidth(240)),
+            SettingsCard(
+                header: t.Message(new("App", "SettingsDeviceType")),
+                description: t.Message(new("App", "SettingsDeviceTypeDescription")),
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                ComboBox(deviceTypeOptions, DeviceTypeIndex(Props.Settings.DeviceType), index =>
+                {
+                    var type = DeviceTypeFromIndex(index);
+                    if (type != Props.Settings.DeviceType)
+                        Props.UpdateSettings(settings => settings with { DeviceType = type });
+                })
+                    .MinWidth(180)),
+            SettingsCard(
+                header: t.Message(new("App", "SettingsDeviceModel")),
+                description: t.Message(new("App", "SettingsDeviceModelDescription")),
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                TextBox(
+                    Props.Settings.DeviceModel,
+                    value => Props.UpdateSettings(settings => settings with { DeviceModel = value }),
+                    placeholderText: Environment.MachineName)
+                    .AutomationName(t.Message(new("App", "SettingsDeviceModel")))
+                    .MinWidth(240)),
+            SettingsCard(
+                header: t.Message(new("App", "SettingsPort")),
+                description: Props.Settings.Port == LocalSendOptions.DefaultPort
+                    ? t.Message(new("App", "SettingsPortDescription"))
+                    : t.Message(new("App", "SettingsPortWarning"), ("port", LocalSendOptions.DefaultPort)),
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                NumberBox(Props.Settings.Port, value =>
+                {
+                    var port = (int)Math.Round(value);
+                    if (port is >= 1 and <= ushort.MaxValue && port != Props.Settings.Port)
+                        Props.UpdateSettings(settings => settings with { Port = port });
+                })
+                    .Range(1, ushort.MaxValue)
+                    .AutomationName(t.Message(new("App", "SettingsPort")))
+                    .MinWidth(140)),
+            SettingsCard(
+                header: t.Message(new("App", "SettingsNetworkInterfaces")),
+                description: t.Message(new("App", "SettingsNetworkInterfacesAll")),
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                Button(t.Message(new("App", "Change")), () => navigation.Navigate(AppRoute.NetworkInterfaces))
+                    .AutomationName(t.Message(new("App", "SettingsNetworkInterfaces")))),
+            SettingsCard(
+                header: t.Message(new("App", "SettingsDiscoveryTimeout")),
+                description: t.Message(new("App", "SettingsDiscoveryTimeoutDescription")),
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                NumberBox(Props.Settings.DiscoveryTimeoutMs, value =>
+                {
+                    var timeout = (int)Math.Round(value);
+                    if (timeout > 0 && timeout != Props.Settings.DiscoveryTimeoutMs)
+                        Props.UpdateSettings(settings => settings with { DiscoveryTimeoutMs = timeout });
+                })
+                    .Range(1, 60_000)
+                    .AutomationName(t.Message(new("App", "SettingsDiscoveryTimeout")))
+                    .MinWidth(140)),
+            SettingsCard(
+                header: t.Message(new("App", "SettingsEncryption")),
+                description: t.Message(new("App", "SettingsEncryptionDescription")),
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                ToggleSwitch(Props.Settings.EnableHttps, value =>
+                {
+                    Props.UpdateSettings(settings => settings with { EnableHttps = value });
+                    if (!value)
+                        setEncryptionNoticeOpen(true);
+                })),
+            SettingsCard(
+                header: t.Message(new("App", "SettingsMulticast")),
+                description: string.Equals(
+                        Props.Settings.ResolvedMulticastAddress.ToString(),
+                        LocalSendOptions.DefaultMulticastAddress.ToString(),
+                        StringComparison.Ordinal)
+                    ? t.Message(new("App", "SettingsMulticastDescription"))
+                    : t.Message(
+                        new("App", "SettingsMulticastWarning"),
+                        ("group", LocalSendOptions.DefaultMulticastAddress)),
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                TextBox(Props.Settings.MulticastGroup, value =>
+                    Props.UpdateSettings(settings => settings with { MulticastGroup = value }))
+                    .AutomationName(t.Message(new("App", "SettingsMulticast")))
+                    .MinWidth(180)));
 
         return ScrollView(
             VStack(24,
@@ -192,9 +306,26 @@ sealed class SettingsPage : Component<SettingsPageProps>
                         IsOpen = true,
                         IsClosable = false,
                     }).Severity(InfoBarSeverity.Error),
+                Props.Runtime.DiscoveryWarning is null
+                    ? null
+                    : (InfoBar(t.Message(new("App", "NodeDiscoveryLimited")), Props.Runtime.DiscoveryWarning) with
+                    {
+                        IsOpen = true,
+                        IsClosable = false,
+                    }).Severity(InfoBarSeverity.Warning),
                 generalCards,
                 receiveCards,
-                networkCards)
+                networkCards,
+                ContentDialog(
+                    t.Message(new("App", "SettingsEncryptionDisabledTitle")),
+                    TextBlock(t.Message(new("App", "SettingsEncryptionDisabledNotice")))
+                        .TextWrapping(TextWrapping.WrapWholeWords),
+                    primaryButtonText: t.Message(new("App", "Close"))) with
+                {
+                    IsOpen = encryptionNoticeOpen,
+                    DefaultButton = ContentDialogButton.Close,
+                    OnClosed = _ => setEncryptionNoticeOpen(false),
+                })
             .Padding(36))
             .HorizontalContentAlignment(HorizontalAlignment.Stretch)
             .Landmark(AutomationLandmarkType.Main);
@@ -258,4 +389,22 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 .Margin(bottom: 8),
             .. cards.Select(card => card.HAlign(HorizontalAlignment.Stretch)),
         ]);
+
+    private static readonly LocalSendDeviceType[] DeviceTypes =
+    [
+        LocalSendDeviceType.Desktop,
+        LocalSendDeviceType.Mobile,
+        LocalSendDeviceType.Web,
+        LocalSendDeviceType.Headless,
+        LocalSendDeviceType.Server,
+    ];
+
+    private static int DeviceTypeIndex(LocalSendDeviceType type)
+    {
+        var index = Array.IndexOf(DeviceTypes, type);
+        return index < 0 ? 0 : index;
+    }
+
+    private static LocalSendDeviceType DeviceTypeFromIndex(int index) =>
+        index is >= 0 and < 5 ? DeviceTypes[index] : LocalSendDeviceType.Desktop;
 }

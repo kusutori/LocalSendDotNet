@@ -525,6 +525,15 @@ static class TransferOverlayVisuals
         _ => "Remote",
     };
 
+    public static string DeviceTypeGlyph(LocalSendDeviceType type) => type switch
+    {
+        LocalSendDeviceType.Mobile => "\uE8EA",
+        LocalSendDeviceType.Web => "\uE12B",
+        LocalSendDeviceType.Server => "\uE968",
+        LocalSendDeviceType.Headless => "\uE950",
+        _ => "\uE701",
+    };
+
     public static string DeviceModel(IntlAccessor t, string? model, LocalSendDeviceType type) =>
         string.IsNullOrWhiteSpace(model) ? type switch
         {

@@ -92,7 +92,9 @@
   <data name="NavSettings" xml:space="preserve"><value>Settings</value></data>
   <data name="NearbyDevices" xml:space="preserve"><value>Nearby devices</value></data>
   <data name="NetworkStartFailed" xml:space="preserve"><value>Could not start the network service</value></data>
+  <data name="DiscoveryScanHint" xml:space="preserve"><value>Multicast discovery is unavailable. Nearby devices are found by scanning this network.</value></data>
   <data name="NodeDisconnected" xml:space="preserve"><value>Disconnected</value></data>
+  <data name="NodeDiscoveryLimited" xml:space="preserve"><value>Connected; nearby search is using a network scan</value></data>
   <data name="NodeFaulted" xml:space="preserve"><value>Network service unavailable</value></data>
   <data name="NodeRunning" xml:space="preserve"><value>Connected to the local network</value></data>
   <data name="NodeStarting" xml:space="preserve"><value>Starting…</value></data>
@@ -145,8 +147,18 @@
   <data name="SettingsAnimationsDescription" xml:space="preserve"><value>Enable page transitions and status animations.</value></data>
   <data name="SettingsAutoSave" xml:space="preserve"><value>Auto save</value></data>
   <data name="SettingsAutoSaveDescription" xml:space="preserve"><value>Automatically accept and save incoming content.</value></data>
+  <data name="SettingsDeviceModel" xml:space="preserve"><value>Device model</value></data>
+  <data name="SettingsDeviceModelDescription" xml:space="preserve"><value>Optional model name advertised to other devices. Leave empty to use this computer''s name.</value></data>
   <data name="SettingsDeviceName" xml:space="preserve"><value>Device name</value></data>
   <data name="SettingsDeviceNameDescription" xml:space="preserve"><value>Other devices see this name. Restart the server to apply a change.</value></data>
+  <data name="SettingsDeviceType" xml:space="preserve"><value>Device type</value></data>
+  <data name="SettingsDeviceTypeDescription" xml:space="preserve"><value>Choose the icon other devices show for this computer.</value></data>
+  <data name="SettingsDiscoveryTimeout" xml:space="preserve"><value>Discovery timeout</value></data>
+  <data name="SettingsDiscoveryTimeoutDescription" xml:space="preserve"><value>How long each HTTP nearby-device probe waits, in milliseconds.</value></data>
+  <data name="SettingsEncryption" xml:space="preserve"><value>Encryption</value></data>
+  <data name="SettingsEncryptionDescription" xml:space="preserve"><value>Use HTTPS and certificate identity for transfers.</value></data>
+  <data name="SettingsEncryptionDisabledNotice" xml:space="preserve"><value>Encryption is off. Nearby devices will connect over HTTP, and identity checks are weaker. Restart the server to apply this.</value></data>
+  <data name="SettingsEncryptionDisabledTitle" xml:space="preserve"><value>Encryption disabled</value></data>
   <data name="SettingsFavoritesOnly" xml:space="preserve"><value>Only auto-receive from favorites</value></data>
   <data name="SettingsFavoritesOnlyDescription" xml:space="preserve"><value>When auto save is on, trust only devices in your favorites.</value></data>
   <data name="SettingsGeneral" xml:space="preserve"><value>General</value></data>
@@ -154,6 +166,15 @@
   <data name="SettingsLanguageDescription" xml:space="preserve"><value>Change the language used by the interface.</value></data>
   <data name="SettingsNeedRestart" xml:space="preserve"><value>Settings changed. Restart the server to apply them.</value></data>
   <data name="SettingsNetwork" xml:space="preserve"><value>Network</value></data>
+  <data name="SettingsNetworkInterfaces" xml:space="preserve"><value>Network interfaces</value></data>
+  <data name="SettingsNetworkInterfacesAll" xml:space="preserve"><value>All</value></data>
+  <data name="SettingsNetworkInterfacesPlaceholder" xml:space="preserve"><value>Adapter filtering is not available yet. This page is a placeholder for choosing which network interfaces LocalSend uses.</value></data>
+  <data name="SettingsPort" xml:space="preserve"><value>Port</value></data>
+  <data name="SettingsPortDescription" xml:space="preserve"><value>TCP and UDP port used by the LocalSend server.</value></data>
+  <data name="SettingsPortWarning" xml:space="preserve"><value>Custom port. Other devices still look for {port} unless they are changed too.</value></data>
+  <data name="SettingsMulticast" xml:space="preserve"><value>Multicast</value></data>
+  <data name="SettingsMulticastDescription" xml:space="preserve"><value>IPv4 multicast group used to announce this device.</value></data>
+  <data name="SettingsMulticastWarning" xml:space="preserve"><value>Custom multicast group. Other LocalSend devices expect {group} unless they are changed too.</value></data>
   <data name="SettingsMinimizeToTray" xml:space="preserve"><value>Minimize to the system tray when closing</value></data>
   <data name="SettingsMinimizeToTrayDescription" xml:space="preserve"><value>Keep receiving in the background when the main window closes.</value></data>
   <data name="SettingsReceive" xml:space="preserve"><value>Receive</value></data>

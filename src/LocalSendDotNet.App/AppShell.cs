@@ -232,8 +232,12 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         var titleBar = (TitleBar("LocalSend") with
         {
             Subtitle = t.Message(new("App", "Tagline")),
-            RightHeader = Caption(NodeStatusText(t, runtime.NodeState))
-                .Foreground(runtime.Error is null ? Theme.SecondaryText : Theme.SystemCritical),
+            RightHeader = Caption(NodeStatusText(t, runtime.NodeState, runtime.DiscoveryWarning))
+                .Foreground(runtime.Error is not null
+                    ? Theme.SystemCritical
+                    : runtime.DiscoveryWarning is not null
+                        ? Theme.SystemCaution
+                        : Theme.SecondaryText),
         })
         .Tall()
         .Icon(ImageIcon(new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"), UriKind.Absolute)))
@@ -261,6 +265,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 StartOrRestartServer,
                 StopServer))
                 .WithKey($"settings:{Props.Locale}"),
+            AppRoute.NetworkInterfaces => Component<NetworkInterfacesPage>(),
             _ => TextBlock(t.Message(new("App", "PageNotFound"))),
         }) with
         {
@@ -403,6 +408,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 Devices = [],
                 IncomingTransfers = [],
                 Error = null,
+                DiscoveryWarning = null,
             });
             setServerDesired(true);
             updateServerEpoch(epoch => epoch + 1);
@@ -420,6 +426,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 Devices = [],
                 IncomingTransfers = [],
                 Error = null,
+                DiscoveryWarning = null,
             });
             setServerDesired(false);
         }
@@ -439,6 +446,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                         Devices = [],
                         IncomingTransfers = [],
                         Error = null,
+                        DiscoveryWarning = null,
                     });
                     return;
                 }
@@ -446,10 +454,14 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 node = new LocalSendNode(new LocalSendOptions
                 {
                     Alias = settings.ResolvedAlias,
-                    DeviceModel = Environment.MachineName,
-                    DeviceType = LocalSendDeviceType.Desktop,
+                    DeviceModel = settings.ResolvedDeviceModel,
+                    DeviceType = settings.DeviceType,
                     DataDirectory = AppPlatform.DataDirectory,
                     DownloadDirectory = settings.DownloadDirectory,
+                    Port = settings.Port,
+                    EnableHttps = settings.EnableHttps,
+                    MulticastAddress = settings.ResolvedMulticastAddress,
+                    DiscoveryTimeout = TimeSpan.FromMilliseconds(Math.Max(1, settings.DiscoveryTimeoutMs)),
                 });
                 nodeRef.Current = node;
                 ownerNodeSession.Current = session;
@@ -459,6 +471,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                     Devices = [],
                     IncomingTransfers = [],
                     Error = null,
+                    DiscoveryWarning = null,
                 });
 
                 await node.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -468,6 +481,8 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                     Identity = node.Identity,
                     Devices = node.GetDevices(),
                     Error = null,
+                    AppliedMulticastGroup = settings.ResolvedMulticastAddress.ToString(),
+                    DiscoveryWarning = node.DiscoveryError,
                 });
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -480,6 +495,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 {
                     NodeState = node?.State ?? LocalSendNodeState.Faulted,
                     Error = exception.Message,
+                    DiscoveryWarning = null,
                 });
                 return;
             }
@@ -569,6 +585,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 {
                     Devices = node.GetDevices(),
                     Error = null,
+                    DiscoveryWarning = node.DiscoveryError,
                 });
             }
             catch (Exception exception)
@@ -586,6 +603,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         AppRoute.History => "receive",
         AppRoute.Send => "send",
         AppRoute.Settings => "settings",
+        AppRoute.NetworkInterfaces => "settings",
         _ => "receive",
     };
 
@@ -596,9 +614,10 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         _ => AppRoute.Receive,
     };
 
-    private static string NodeStatusText(IntlAccessor t, LocalSendNodeState state) => state switch
+    private static string NodeStatusText(IntlAccessor t, LocalSendNodeState state, string? discoveryWarning) => state switch
     {
         LocalSendNodeState.Starting => t.Message(new("App", "NodeStarting")),
+        LocalSendNodeState.Running when discoveryWarning is not null => t.Message(new("App", "NodeDiscoveryLimited")),
         LocalSendNodeState.Running => t.Message(new("App", "NodeRunning")),
         LocalSendNodeState.Faulted => t.Message(new("App", "NodeFaulted")),
         LocalSendNodeState.Stopping => t.Message(new("App", "NodeStopping")),

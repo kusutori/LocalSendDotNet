@@ -92,7 +92,9 @@
   <data name="NavSettings" xml:space="preserve"><value>设置</value></data>
   <data name="NearbyDevices" xml:space="preserve"><value>附近的设备</value></data>
   <data name="NetworkStartFailed" xml:space="preserve"><value>无法启动网络服务</value></data>
+  <data name="DiscoveryScanHint" xml:space="preserve"><value>多播发现不可用。正在通过扫描局域网查找附近设备。</value></data>
   <data name="NodeDisconnected" xml:space="preserve"><value>未连接</value></data>
+  <data name="NodeDiscoveryLimited" xml:space="preserve"><value>已连接；附近设备通过网络扫描查找</value></data>
   <data name="NodeFaulted" xml:space="preserve"><value>网络服务不可用</value></data>
   <data name="NodeRunning" xml:space="preserve"><value>已连接到本地网络</value></data>
   <data name="NodeStarting" xml:space="preserve"><value>正在启动…</value></data>
@@ -145,8 +147,18 @@
   <data name="SettingsAnimationsDescription" xml:space="preserve"><value>启用页面切换和状态过渡动画。</value></data>
   <data name="SettingsAutoSave" xml:space="preserve"><value>自动保存</value></data>
   <data name="SettingsAutoSaveDescription" xml:space="preserve"><value>自动接受并保存收到的内容。</value></data>
+  <data name="SettingsDeviceModel" xml:space="preserve"><value>设备型号</value></data>
+  <data name="SettingsDeviceModelDescription" xml:space="preserve"><value>向其他设备展示的型号。留空则使用此电脑的名称。</value></data>
   <data name="SettingsDeviceName" xml:space="preserve"><value>设备名称</value></data>
   <data name="SettingsDeviceNameDescription" xml:space="preserve"><value>其他设备将看到这个名称。更改后需重启服务器。</value></data>
+  <data name="SettingsDeviceType" xml:space="preserve"><value>设备类型</value></data>
+  <data name="SettingsDeviceTypeDescription" xml:space="preserve"><value>选择其他设备看到的图标，例如电脑或手机。</value></data>
+  <data name="SettingsDiscoveryTimeout" xml:space="preserve"><value>搜索超时</value></data>
+  <data name="SettingsDiscoveryTimeoutDescription" xml:space="preserve"><value>每次用 HTTP 探测附近设备时等待的毫秒数。</value></data>
+  <data name="SettingsEncryption" xml:space="preserve"><value>加密</value></data>
+  <data name="SettingsEncryptionDescription" xml:space="preserve"><value>使用 HTTPS 和证书身份进行传输。</value></data>
+  <data name="SettingsEncryptionDisabledNotice" xml:space="preserve"><value>加密已关闭。附近设备将通过 HTTP 连接，身份校验会变弱。需重启服务器后生效。</value></data>
+  <data name="SettingsEncryptionDisabledTitle" xml:space="preserve"><value>已关闭加密</value></data>
   <data name="SettingsFavoritesOnly" xml:space="preserve"><value>仅自动接收收藏设备</value></data>
   <data name="SettingsFavoritesOnlyDescription" xml:space="preserve"><value>自动保存开启时，只信任收藏列表中的设备。</value></data>
   <data name="SettingsGeneral" xml:space="preserve"><value>通用</value></data>
@@ -154,6 +166,15 @@
   <data name="SettingsLanguageDescription" xml:space="preserve"><value>更改界面显示语言。</value></data>
   <data name="SettingsNeedRestart" xml:space="preserve"><value>设置已更改。重启服务器后生效。</value></data>
   <data name="SettingsNetwork" xml:space="preserve"><value>名称与网络</value></data>
+  <data name="SettingsNetworkInterfaces" xml:space="preserve"><value>网络接口</value></data>
+  <data name="SettingsNetworkInterfacesAll" xml:space="preserve"><value>全部</value></data>
+  <data name="SettingsNetworkInterfacesPlaceholder" xml:space="preserve"><value>网卡筛选尚未实现。此页是占位界面，以后可以在这里选择 LocalSend 使用的网络接口。</value></data>
+  <data name="SettingsPort" xml:space="preserve"><value>端口</value></data>
+  <data name="SettingsPortDescription" xml:space="preserve"><value>LocalSend 服务器使用的 TCP 和 UDP 端口。</value></data>
+  <data name="SettingsPortWarning" xml:space="preserve"><value>正在使用自定义端口。其他设备默认仍会查找 {port}，除非也改成相同值。</value></data>
+  <data name="SettingsMulticast" xml:space="preserve"><value>多播</value></data>
+  <data name="SettingsMulticastDescription" xml:space="preserve"><value>用于宣告本机的 IPv4 多播组。</value></data>
+  <data name="SettingsMulticastWarning" xml:space="preserve"><value>正在使用自定义多播组。其他 LocalSend 设备默认使用 {group}，除非也改成相同值。</value></data>
   <data name="SettingsMinimizeToTray" xml:space="preserve"><value>关闭时最小化到系统托盘</value></data>
   <data name="SettingsMinimizeToTrayDescription" xml:space="preserve"><value>关闭主窗口时继续在后台接收。</value></data>
   <data name="SettingsReceive" xml:space="preserve"><value>接收</value></data>

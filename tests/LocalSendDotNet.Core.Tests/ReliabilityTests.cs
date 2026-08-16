@@ -149,6 +149,26 @@ public sealed class ReliabilityTests
     }
 
     [Fact(Timeout = 15_000)]
+    public async Task OccupiedUdpPortLeavesHttpServerRunning()
+    {
+        var root = TestDirectory.Create();
+        using var blocker = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        blocker.ExclusiveAddressUse = true;
+        blocker.Bind(new IPEndPoint(IPAddress.Any, 0));
+        var port = ((IPEndPoint)blocker.LocalEndPoint!).Port;
+        await using var node = new LocalSendNode(TestOptions(port, root));
+        try
+        {
+            await node.StartAsync();
+            Assert.Equal(LocalSendNodeState.Running, node.State);
+            Assert.NotNull(node.Identity);
+            Assert.NotNull(node.DiscoveryError);
+            await node.StopAsync();
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact(Timeout = 15_000)]
     public async Task OccupiedTcpPortProducesActionableException()
     {
         var root = TestDirectory.Create();

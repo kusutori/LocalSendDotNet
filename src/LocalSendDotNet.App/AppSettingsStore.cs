@@ -1,5 +1,8 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LocalSendDotNet;
 
 static class AppSettingsStore
 {
@@ -51,6 +54,12 @@ sealed class AppSettingsFile
     public bool? AnimationsEnabled { get; set; }
     public bool? FavoritesOnly { get; set; }
     public string? DownloadDirectory { get; set; }
+    public string? DeviceType { get; set; }
+    public string? DeviceModel { get; set; }
+    public int? Port { get; set; }
+    public int? DiscoveryTimeoutMs { get; set; }
+    public bool? EnableHttps { get; set; }
+    public string? MulticastGroup { get; set; }
 
     public static AppSettingsFile FromSettings(AppSettings settings) => new()
     {
@@ -63,6 +72,12 @@ sealed class AppSettingsFile
         AnimationsEnabled = settings.AnimationsEnabled,
         FavoritesOnly = settings.FavoritesOnly,
         DownloadDirectory = settings.DownloadDirectory,
+        DeviceType = settings.DeviceType.ToString(),
+        DeviceModel = settings.DeviceModel,
+        Port = settings.Port,
+        DiscoveryTimeoutMs = settings.DiscoveryTimeoutMs,
+        EnableHttps = settings.EnableHttps,
+        MulticastGroup = settings.MulticastGroup,
     };
 
     public AppSettings ToSettings()
@@ -83,8 +98,21 @@ sealed class AppSettingsFile
             DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirectory)
                 ? defaults.DownloadDirectory
                 : DownloadDirectory,
+            DeviceType = Enum.TryParse<LocalSendDeviceType>(DeviceType, ignoreCase: true, out var deviceType)
+                ? deviceType
+                : defaults.DeviceType,
+            DeviceModel = DeviceModel ?? defaults.DeviceModel,
+            Port = Port is >= 1 and <= ushort.MaxValue ? Port.Value : defaults.Port,
+            DiscoveryTimeoutMs = DiscoveryTimeoutMs is > 0 ? DiscoveryTimeoutMs.Value : defaults.DiscoveryTimeoutMs,
+            EnableHttps = EnableHttps ?? defaults.EnableHttps,
+            MulticastGroup = IsMulticastGroup(MulticastGroup) ? MulticastGroup! : defaults.MulticastGroup,
         };
     }
+
+    private static bool IsMulticastGroup(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && IPAddress.TryParse(value, out var address)
+        && address.AddressFamily == AddressFamily.InterNetwork;
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNameCaseInsensitive = true)]

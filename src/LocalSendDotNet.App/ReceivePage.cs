@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using static Microsoft.UI.Reactor.Factories;
 using static LocalSendDotNet.App.Controls.Toolkit.SegmentedElement;
+using static TransferOverlayVisuals;
 
 sealed record ReceivePageProps(
     AppRuntimeState Runtime,
@@ -26,8 +27,16 @@ sealed class ReceivePage : Component<ReceivePageProps>
             new SegmentedItem { Content = t.Message(new("App", "AutoSaveOn")) },
         }, t.Locale);
         var identity = Props.Runtime.Identity;
-        var (alias, setAlias) = UseState(AppSettingsStore.Load().ResolvedAlias);
-        UseNavigationLifecycle(onNavigatedTo: _ => setAlias(AppSettingsStore.Load().ResolvedAlias));
+        var stored = AppSettingsStore.Load();
+        var (alias, setAlias) = UseState(stored.ResolvedAlias);
+        var (deviceType, setDeviceType) = UseState(stored.DeviceType);
+        UseNavigationLifecycle(onNavigatedTo: _ =>
+        {
+            var current = AppSettingsStore.Load();
+            setAlias(current.ResolvedAlias);
+            setDeviceType(current.DeviceType);
+        });
+        var displayedType = deviceType;
         var fingerprint = identity?.Fingerprint;
         var fingerprintPreview = fingerprint is null ? null : fingerprint[..12];
         var shortId = fingerprint is null
@@ -35,7 +44,7 @@ sealed class ReceivePage : Component<ReceivePageProps>
             : $"#{Convert.ToInt32(fingerprint[..4], 16) % 1000:D3}  #1";
 
         var identityPanel = FlexColumn(
-            Border(Icon(FontIcon("\uE701", fontSize: 48)).AccessibilityHidden())
+            Border(Icon(FontIcon(DeviceTypeGlyph(displayedType), fontSize: 48)).AccessibilityHidden())
                 .Size(112, 112)
                 .CornerRadius(56)
                 .Background(Theme.SubtleFill)

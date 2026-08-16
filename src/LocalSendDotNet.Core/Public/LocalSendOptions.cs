@@ -32,6 +32,8 @@ public sealed class LocalSendOptions
     public int MaxConcurrentTransfers { get; init; } = 4;
     /// <summary>Gets the maximum number of simultaneously open incoming file bodies.</summary>
     public int MaxConcurrentFileUploads { get; init; } = 8;
+    /// <summary>Gets how long one nearby-device HTTP probe may wait.</summary>
+    public TimeSpan DiscoveryTimeout { get; init; } = TimeSpan.FromMilliseconds(500);
     /// <summary>Gets the timeout for ordinary HTTP requests.</summary>
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
     /// <summary>Gets the total timeout for one file upload request.</summary>
@@ -67,6 +69,7 @@ public sealed class LocalSendOptions
         ArgumentOutOfRangeException.ThrowIfLessThan(MaxIncomingItemsPerTransfer, 1);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxIncomingTransferBytes);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxPrepareRequestBytes);
+        ValidateTimeout(DiscoveryTimeout, nameof(DiscoveryTimeout));
         ValidateTimeout(RequestTimeout, nameof(RequestTimeout));
         ValidateTimeout(UploadTimeout, nameof(UploadTimeout));
         ValidateTimeout(CancelRequestTimeout, nameof(CancelRequestTimeout));

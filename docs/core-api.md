@@ -4,9 +4,9 @@
 
 ## Lifecycle and identity
 
-Create one node for the lifetime of the host application. `StartAsync` loads or creates the persistent certificate identity, starts HTTPS and discovery, and completes after the first announcement burst. A stopped node is intentionally not restartable; dispose it and create a new instance. `State`, `Identity`, and `WatchStateChangesAsync` are suitable for application status indicators.
+Create one node for the lifetime of the host application. `StartAsync` loads or creates the persistent certificate identity and starts the HTTP server. Multicast discovery is started when the UDP port can be bound; a multicast failure leaves the node `Running` so transfers still work, and `DiscoveryError` explains why announcements are unavailable. Nearby devices are then found with an HTTP `/24` subnet scan. A stopped node is intentionally not restartable; dispose it and create a new instance. `State`, `Identity`, and `WatchStateChangesAsync` are suitable for application status indicators.
 
-Startup failures enter `Faulted` and may be retried on the same instance after correcting the cause. `PortUnavailableException`, `DiscoveryUnavailableException`, and `IdentityLoadException` provide actionable startup categories. A caller-cancelled startup returns to `Created`.
+Startup failures enter `Faulted` and may be retried on the same instance after correcting the cause. `PortUnavailableException` and `IdentityLoadException` remain fatal. `DiscoveryUnavailableException` is no longer fatal during `StartAsync`. A caller-cancelled startup returns to `Created`.
 
 The library never writes to the console and does not switch synchronization contexts. Supply an `ILoggerFactory` for diagnostics. Callers decide how `IProgress<TransferProgress>` callbacks are marshalled to their UI thread.
 
@@ -14,7 +14,7 @@ The library never writes to the console and does not switch synchronization cont
 
 Use `GetDevices()` for an initial snapshot and `WatchDeviceChangesAsync()` for additions, updates, and removals. Devices expire after `DeviceExpiration` when no new announcement or registration is seen. HTTPS is preferred by `LocalSendDevice.PreferredEndpoint`.
 
-Discovery listens for operating-system address changes and rebinds its IPv4 multicast receiver after a short debounce. Periodic maintenance retries interfaces that could not join. `RefreshAsync` forces a receiver rebind before announcing and is appropriate when an application receives an explicit resume notification.
+Discovery listens for operating-system address changes and rebinds its IPv4 multicast receiver after a short debounce. Periodic maintenance retries interfaces that could not join. `RefreshAsync` retries multicast, announces when it is available, and always scans local `/24` subnets over HTTP using `DiscoveryTimeout`.
 
 For a manually entered address, call `ProbeDeviceAsync(endpoint)` first. HTTPS probes validate that the certificate is current, self-signed consistently, and agrees with the fingerprint returned by `/info`; the returned fingerprint is still trust-on-first-use and should be shown for user confirmation. After confirmation, call `AddKnownDeviceAsync(endpoint, fingerprint)`. Manually trusted devices remain in the in-memory list until `RemoveDevice` or node disposal instead of expiring with multicast peers. HTTP probes cannot cryptographically verify identity and return `IdentityVerified == false`.
 

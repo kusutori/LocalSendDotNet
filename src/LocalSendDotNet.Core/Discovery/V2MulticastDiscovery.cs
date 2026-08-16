@@ -19,7 +19,7 @@ internal sealed class V2MulticastDiscovery(
     private readonly SemaphoreSlim _announceGate = new(1, 1);
     private readonly SemaphoreSlim _receiverGate = new(1, 1);
     private readonly ConcurrentDictionary<IPAddress, byte> _registrations = new();
-    private readonly Func<IReadOnlyList<IPAddress>> _addressProvider = addressProvider ?? GetUsableAddresses;
+    private readonly Func<IReadOnlyList<IPAddress>> _addressProvider = addressProvider ?? LocalNetworkAddresses.GetUnicastIPv4;
     private Socket? _receiver;
     private CancellationTokenSource? _receiverStop;
     private Task? _receiveLoop;
@@ -215,14 +215,6 @@ internal sealed class V2MulticastDiscovery(
         catch (Exception exception) { logger.LogWarning(exception, "LocalSend discovery network recovery failed"); }
         finally { Interlocked.Exchange(ref _refreshScheduled, 0); }
     }
-
-    private static IReadOnlyList<IPAddress> GetUsableAddresses() => NetworkInterface.GetAllNetworkInterfaces()
-        .Where(static nic => nic.OperationalStatus == OperationalStatus.Up && nic.NetworkInterfaceType is not NetworkInterfaceType.Loopback and not NetworkInterfaceType.Tunnel)
-        .SelectMany(static nic => nic.GetIPProperties().UnicastAddresses)
-        .Select(static address => address.Address)
-        .Where(static address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
-        .Distinct()
-        .ToArray();
 
     public async ValueTask DisposeAsync()
     {

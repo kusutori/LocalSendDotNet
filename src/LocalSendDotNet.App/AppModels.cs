@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using LocalSendDotNet;
 
 enum AppRoute
@@ -6,6 +8,7 @@ enum AppRoute
     History,
     Send,
     Settings,
+    NetworkInterfaces,
 }
 
 enum AutoSaveMode
@@ -24,7 +27,13 @@ sealed record AppSettings(
     bool StartWithWindows,
     bool AnimationsEnabled,
     bool FavoritesOnly,
-    string DownloadDirectory)
+    string DownloadDirectory,
+    LocalSendDeviceType DeviceType,
+    string DeviceModel,
+    int Port,
+    int DiscoveryTimeoutMs,
+    bool EnableHttps,
+    string MulticastGroup)
 {
     public static readonly AppSettings Default = new(
         Alias: string.IsNullOrWhiteSpace(Environment.UserName) ? Environment.MachineName : Environment.UserName,
@@ -35,10 +44,25 @@ sealed record AppSettings(
         StartWithWindows: false,
         AnimationsEnabled: true,
         FavoritesOnly: false,
-        DownloadDirectory: AppPlatform.DefaultDownloadDirectory);
+        DownloadDirectory: AppPlatform.DefaultDownloadDirectory,
+        DeviceType: LocalSendDeviceType.Desktop,
+        DeviceModel: "",
+        Port: LocalSendOptions.DefaultPort,
+        DiscoveryTimeoutMs: 500,
+        EnableHttps: true,
+        MulticastGroup: LocalSendOptions.DefaultMulticastAddress.ToString());
 
     public string ResolvedAlias =>
         string.IsNullOrWhiteSpace(Alias) ? Default.Alias : Alias.Trim();
+
+    public string ResolvedDeviceModel =>
+        string.IsNullOrWhiteSpace(DeviceModel) ? Environment.MachineName : DeviceModel.Trim();
+
+    public IPAddress ResolvedMulticastAddress =>
+        IPAddress.TryParse(MulticastGroup, out var address)
+            && address.AddressFamily == AddressFamily.InterNetwork
+                ? address
+                : LocalSendOptions.DefaultMulticastAddress;
 }
 
 sealed record AppRuntimeState(
@@ -46,14 +70,18 @@ sealed record AppRuntimeState(
     LocalSendIdentity? Identity,
     IReadOnlyList<LocalSendDevice> Devices,
     IReadOnlyList<IncomingTransferRequest> IncomingTransfers,
-    string? Error)
+    string? Error,
+    string? AppliedMulticastGroup,
+    string? DiscoveryWarning)
 {
     public static readonly AppRuntimeState Initial = new(
         LocalSendNodeState.Created,
         Identity: null,
         Devices: Array.Empty<LocalSendDevice>(),
         IncomingTransfers: Array.Empty<IncomingTransferRequest>(),
-        Error: null);
+        Error: null,
+        AppliedMulticastGroup: null,
+        DiscoveryWarning: null);
 }
 
 sealed record OutgoingTransferViewState(

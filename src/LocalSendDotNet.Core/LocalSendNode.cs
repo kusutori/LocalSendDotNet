@@ -34,6 +34,7 @@ public sealed class LocalSendNode : IAsyncDisposable
     private V2MulticastDiscovery? _discovery;
     private Task? _maintenance;
     private LocalSendNodeState _state = LocalSendNodeState.Created;
+    private string? _discoveryError;
     private bool _started;
     private bool _stopped;
     private bool _disposed;
@@ -54,13 +55,17 @@ public sealed class LocalSendNode : IAsyncDisposable
     /// <summary>Gets the current lifecycle state.</summary>
     public LocalSendNodeState State { get { lock (_stateGate) return _state; } }
 
+    /// <summary>Gets why multicast discovery is unavailable after a successful HTTP start, or <see langword="null"/> when it is running.</summary>
+    public string? DiscoveryError { get { lock (_stateGate) return _discoveryError; } }
+
     /// <summary>Gets the persistent local identity after startup, or <see langword="null"/> before identity loading.</summary>
     public LocalSendIdentity? Identity => _identity is null ? null : new(
         _options.Alias, V2Constants.Version, _options.DeviceModel, _options.DeviceType, _identity.Fingerprint,
         _options.Port, _options.EnableHttps ? LocalSendProtocol.Https : LocalSendProtocol.Http);
 
-    /// <summary>Loads identity, starts the server and discovery receiver, and sends an initial announcement burst.</summary>
+    /// <summary>Loads identity, starts the HTTP server, and starts multicast discovery when the UDP port is available.</summary>
     /// <param name="cancellationToken">Cancels startup. A cancelled startup may be retried.</param>
+    /// <remarks>A multicast bind failure leaves the node running so transfers still work. Nearby devices are then found with an HTTP subnet scan.</remarks>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -79,12 +84,12 @@ public sealed class LocalSendNode : IAsyncDisposable
                 _client = new V2HttpClient(_identity, _options);
                 _server = new V2Server(_options, _identity, () => CreateLocalInfo(), OnRegisterAsync, OnPrepareAsync, OnUploadAsync, OnCancelAsync, _logger);
                 await _server.StartAsync(cancellationToken).ConfigureAwait(false);
-                _discovery = new V2MulticastDiscovery(_options, () => CreateLocalInfo(announce: true), OnAnnouncementAsync, _logger);
-                await _discovery.StartAsync(cancellationToken).ConfigureAwait(false);
-                await _discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false);
+                await StartDiscoveryAsync(cancellationToken).ConfigureAwait(false);
                 _started = true;
                 SetState(LocalSendNodeState.Running);
                 _maintenance = MaintainAsync(_lifetime.Token);
+                if (_discovery is null)
+                    _ = ScanSubnetsAsync(_lifetime.Token);
             }
             catch (Exception exception)
             {
@@ -103,6 +108,7 @@ public sealed class LocalSendNode : IAsyncDisposable
                 _client = null;
                 _identity?.Dispose();
                 _identity = null;
+                _discoveryError = null;
                 _started = false;
                 SetState(exception is OperationCanceledException ? LocalSendNodeState.Created : LocalSendNodeState.Faulted,
                     exception is OperationCanceledException ? null : exception);
@@ -153,13 +159,28 @@ public sealed class LocalSendNode : IAsyncDisposable
         finally { _lifecycle.Release(); }
     }
 
-    /// <summary>Forces discovery socket recovery for current interfaces and sends an announcement burst.</summary>
+    /// <summary>Rebinds multicast when possible, announces if it is running, and scans local /24 subnets over HTTP.</summary>
     /// <param name="cancellationToken">Cancels refresh.</param>
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         EnsureStarted();
-        await _discovery!.RefreshInterfacesAsync(force: true, cancellationToken).ConfigureAwait(false);
-        await _discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false);
+        await StartDiscoveryAsync(cancellationToken).ConfigureAwait(false);
+        if (_discovery is not null)
+        {
+            try
+            {
+                await _discovery.RefreshInterfacesAsync(force: true, cancellationToken).ConfigureAwait(false);
+                await _discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logger.LogWarning(exception, "LocalSend multicast refresh failed; continuing with HTTP discovery");
+                SetDiscoveryError(exception.Message);
+            }
+        }
+
+        if (_discovery is null)
+            await ScanSubnetsAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Gets an ordered snapshot of currently known devices.</summary>
@@ -378,6 +399,103 @@ public sealed class LocalSendNode : IAsyncDisposable
     }
 
     private DeviceInfoDto CreateLocalInfo(bool announce = false) => _protocol.CreateDeviceInfo(_identity ?? throw new InvalidOperationException("Identity is not loaded."), _options, announce);
+
+    private async Task StartDiscoveryAsync(CancellationToken cancellationToken)
+    {
+        if (_discovery is not null)
+            return;
+
+        var discovery = new V2MulticastDiscovery(_options, () => CreateLocalInfo(announce: true), OnAnnouncementAsync, _logger);
+        try
+        {
+            await discovery.StartAsync(cancellationToken).ConfigureAwait(false);
+            _discovery = discovery;
+            SetDiscoveryError(null);
+            try { await discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false); }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logger.LogWarning(exception, "LocalSend multicast announce failed");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            await discovery.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "LocalSend multicast discovery is unavailable; HTTP subnet scan will be used");
+            SetDiscoveryError(exception.Message);
+            try { await discovery.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception cleanupException) { _logger.LogDebug(cleanupException, "Could not clean up failed LocalSend discovery"); }
+        }
+    }
+
+    private void SetDiscoveryError(string? message)
+    {
+        lock (_stateGate)
+            _discoveryError = message;
+    }
+
+    private async Task ScanSubnetsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<IPAddress> localAddresses;
+        try { localAddresses = LocalNetworkAddresses.GetUnicastIPv4(); }
+        catch (Exception exception)
+        {
+            _logger.LogDebug(exception, "Could not list interfaces for HTTP discovery");
+            return;
+        }
+
+        var localSet = localAddresses.ToHashSet();
+        var prefixes = localAddresses
+            .Where(static address => !LocalNetworkAddresses.IsAutomaticPrivate(address))
+            .Select(static address => address.GetAddressBytes())
+            .Select(static octets => (octets[0], octets[1], octets[2]))
+            .Distinct()
+            .ToArray();
+        if (prefixes.Length == 0)
+            return;
+
+        using var gate = new SemaphoreSlim(50, 50);
+        var probes = new List<Task>();
+        foreach (var (a, b, c) in prefixes)
+        {
+            for (var host = 1; host <= 254; host++)
+            {
+                var address = new IPAddress([(byte)a, (byte)b, (byte)c, (byte)host]);
+                if (localSet.Contains(address))
+                    continue;
+                probes.Add(ProbeScannedHostAsync(address, gate, cancellationToken));
+            }
+        }
+
+        try { await Task.WhenAll(probes).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private async Task ProbeScannedHostAsync(IPAddress address, SemaphoreSlim gate, CancellationToken cancellationToken)
+    {
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(_options.DiscoveryTimeout);
+            var endpoint = new DeviceEndpoint(address, _options.Port, _options.EnableHttps ? LocalSendProtocol.Https : LocalSendProtocol.Http);
+            var result = await _client!.ProbeAsync(endpoint, timeout.Token, _options.DiscoveryTimeout).ConfigureAwait(false);
+            if (StringComparer.OrdinalIgnoreCase.Equals(result.Fingerprint, _identity!.Fingerprint))
+                return;
+            try { await _client.RegisterAsync(endpoint, result.Fingerprint, CreateLocalInfo(), timeout.Token, _options.DiscoveryTimeout).ConfigureAwait(false); }
+            catch (Exception exception) { _logger.LogDebug(exception, "Could not register with scanned peer {Address}", address); }
+            _devices.Upsert(new LocalSendDevice(result.Info.Alias, result.Info.Version, result.Info.DeviceModel,
+                V2ProtocolAdapter.ParseDeviceType(result.Info.DeviceType), result.Fingerprint, result.Info.Download,
+                [endpoint], DateTimeOffset.UtcNow));
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+        }
+        finally { gate.Release(); }
+    }
 
     private async Task OnAnnouncementAsync(DeviceInfoDto announcement, IPAddress source, CancellationToken cancellationToken)
     {
@@ -641,9 +759,12 @@ public sealed class LocalSendNode : IAsyncDisposable
             {
                 try
                 {
-                    await _discovery!.RefreshInterfacesAsync(force: false, cancellationToken).ConfigureAwait(false);
+                    if (_discovery is not null)
+                    {
+                        await _discovery.RefreshInterfacesAsync(force: false, cancellationToken).ConfigureAwait(false);
+                        await _discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false);
+                    }
                     _devices.RemoveExpired(DateTimeOffset.UtcNow - _options.DeviceExpiration);
-                    await _discovery.AnnounceAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch (Exception exception) { _logger.LogWarning(exception, "LocalSend maintenance iteration failed"); }

@@ -180,7 +180,7 @@ sealed class SendPage : Component<SendPageProps>
 
         var devices = Props.Runtime.Devices;
         Element deviceContent = devices.Count == 0
-            ? EmptyDevices(t, Props.Runtime.NodeState)
+            ? EmptyDevices(t, Props.Runtime.NodeState, Props.Runtime.DiscoveryWarning)
             : VStack(8,
                 devices.Select((device, index) =>
                     DeviceCard(
@@ -876,7 +876,7 @@ sealed class SendPage : Component<SendPageProps>
                     .Foreground(Theme.SecondaryText)));
     }
 
-    private static Element EmptyDevices(IntlAccessor t, LocalSendNodeState state) =>
+    private static Element EmptyDevices(IntlAccessor t, LocalSendNodeState state, string? discoveryWarning) =>
         FlexColumn(
             Icon(state == LocalSendNodeState.Faulted ? "Important" : "Find").AccessibilityHidden(),
             Subtitle(state == LocalSendNodeState.Faulted
@@ -884,7 +884,9 @@ sealed class SendPage : Component<SendPageProps>
                 : t.Message(new("App", "SearchingDevices"))),
             TextBlock(state == LocalSendNodeState.Faulted
                     ? t.Message(new("App", "PortInUseHint"))
-                    : t.Message(new("App", "SameNetworkHint")))
+                    : discoveryWarning is not null
+                        ? t.Message(new("App", "DiscoveryScanHint"))
+                        : t.Message(new("App", "SameNetworkHint")))
                 .Foreground(Theme.SecondaryText)
                 .TextWrapping(TextWrapping.WrapWholeWords)) with
         {

@@ -7,7 +7,7 @@ namespace LocalSendDotNet;
 
 internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions options)
 {
-    public async Task<(RegisterResponseDto Info, string Fingerprint, bool Verified)> ProbeAsync(DeviceEndpoint endpoint, CancellationToken cancellationToken)
+    public async Task<(RegisterResponseDto Info, string Fingerprint, bool Verified)> ProbeAsync(DeviceEndpoint endpoint, CancellationToken cancellationToken, TimeSpan? timeout = null)
     {
         string? certificateFingerprint = null;
         using var handler = new HttpClientHandler();
@@ -28,7 +28,7 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
         using var client = new HttpClient(handler, disposeHandler: false)
         {
             BaseAddress = new Uri($"{(endpoint.Protocol == LocalSendProtocol.Https ? "https" : "http")}://{FormatHost(endpoint.Address)}:{endpoint.Port}"),
-            Timeout = options.RequestTimeout
+            Timeout = timeout ?? options.RequestTimeout
         };
         RegisterResponseDto info;
         try
@@ -49,9 +49,9 @@ internal sealed class V2HttpClient(DeviceIdentity identity, LocalSendOptions opt
         return (info, fingerprint, certificateFingerprint is not null);
     }
 
-    public async Task<RegisterResponseDto> RegisterAsync(DeviceEndpoint endpoint, string expectedFingerprint, DeviceInfoDto localInfo, CancellationToken cancellationToken)
+    public async Task<RegisterResponseDto> RegisterAsync(DeviceEndpoint endpoint, string expectedFingerprint, DeviceInfoDto localInfo, CancellationToken cancellationToken, TimeSpan? timeout = null)
     {
-        using var client = CreateClient(endpoint, expectedFingerprint);
+        using var client = CreateClient(endpoint, expectedFingerprint, timeout);
         using var response = await client.PostAsJsonAsync(V2Constants.BasePath + "/register", localInfo, V2JsonContext.Default.DeviceInfoDto, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync(V2JsonContext.Default.RegisterResponseDto, cancellationToken).ConfigureAwait(false)

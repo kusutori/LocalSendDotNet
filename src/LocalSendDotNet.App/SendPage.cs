@@ -147,40 +147,58 @@ sealed class SendPage : Component<SendPageProps>
             ColumnSpacing = 12,
         };
 
-        Element selectedContent = selectedItems.Count == 0
-            ? Caption(pickerMessage).Foreground(Theme.SecondaryText)
-            : Card(
-                VStack(8,
+        var selectedHeader = selectedItems.Count == 0
+            ? t.Message(new("App", "NothingSelected"))
+            : t.Message(
+                new("App", "SelectedItems"),
+                ("count", selectedItems.Count),
+                ("size", FormatBytes(selectedItems.Sum(static item => item.Length))));
+
+        Element selectedItemsBody = selectedItems.Count == 0
+            ? Caption(pickerMessage)
+                .Foreground(Theme.SecondaryText)
+                .HAlign(HorizontalAlignment.Center)
+                .VAlign(VerticalAlignment.Center)
+            : VStack(8,
+                selectedItems.Select(item => SelectedItemRow(
+                    item,
+                    () => updateSelectedItems(current =>
+                        current.Where(candidate => candidate.Id != item.Id).ToArray()),
+                    t)
+                    .WithKey(item.Id.ToString("N")))
+                .ToArray<Element?>());
+
+        var selectedItemsContent = ScrollView(selectedItemsBody)
+            .HorizontalContentAlignment(HorizontalAlignment.Stretch)
+            .VerticalContentAlignment(VerticalAlignment.Stretch)
+            .Flex(grow: 1, basis: 0);
+
+        var selectedItemsCard = Card(
+                (FlexColumn(
                     FlexRow(
-                        BodyStrong(t.Message(
-                                new("App", "SelectedItems"),
-                                ("count", selectedItems.Count),
-                                ("size", FormatBytes(selectedItems.Sum(static item => item.Length)))))
-                            .Flex(grow: 1, basis: 0),
-                        Button(t.Message(new("App", "Clear")), () =>
-                        {
-                            updateSelectedItems(_ => Array.Empty<SelectedSendItem>());
-                            setPickerMessage(t.Message(new("App", "NothingSelected")));
-                        }).AutomationName(t.Message(new("App", "Clear")))) with
+                        BodyStrong(selectedHeader).Flex(grow: 1, basis: 0),
+                        selectedItems.Count == 0
+                            ? null
+                            : Button(t.Message(new("App", "Clear")), () =>
+                            {
+                                updateSelectedItems(_ => Array.Empty<SelectedSendItem>());
+                                setPickerMessage(t.Message(new("App", "NothingSelected")));
+                            }).AutomationName(t.Message(new("App", "Clear")))) with
                     {
                         AlignItems = FlexAlign.Center,
                         ColumnGap = 8,
                     },
-                    ScrollView(
-                        VStack(4,
-                            selectedItems.Select(item => SelectedItemRow(
-                                item,
-                                () => updateSelectedItems(current =>
-                                    current.Where(candidate => candidate.Id != item.Id).ToArray()),
-                                t)
-                                .WithKey(item.Id.ToString("N")))
-                            .ToArray<Element?>()))
-                        .MaxHeight(156)
-                        .HorizontalContentAlignment(HorizontalAlignment.Stretch)));
+                    selectedItemsContent) with
+                {
+                    RowGap = 12,
+                }))
+            .VAlign(VerticalAlignment.Stretch)
+            .Flex(grow: 1, shrink: 1, basis: 320);
 
         var devices = Props.Runtime.Devices;
-        Element deviceContent = devices.Count == 0
+        Element deviceBody = devices.Count == 0
             ? EmptyDevices(t, Props.Runtime.NodeState, Props.Runtime.DiscoveryWarning)
+                .VAlign(VerticalAlignment.Stretch)
             : VStack(8,
                 devices.Select((device, index) =>
                     DeviceCard(
@@ -203,49 +221,76 @@ sealed class SendPage : Component<SendPageProps>
                         .WithKey(device.Fingerprint))
                 .ToArray<Element?>());
 
-        var page = FlexColumn(
+        var deviceContent = ScrollView(deviceBody)
+            .HorizontalContentAlignment(HorizontalAlignment.Stretch)
+            .VerticalContentAlignment(VerticalAlignment.Stretch)
+            .Flex(grow: 1, basis: 0);
+
+        var nearbyDevicesCard = Card(
+                (FlexColumn(
+                    FlexRow(
+                        BodyStrong(t.Message(new("App", "NearbyDevices")))
+                            .Flex(grow: 1, basis: 0),
+                        Button(Icon("Refresh"), () => _ = Props.RefreshAsync())
+                            .AutomationName(t.Message(new("App", "RefreshDevices")))
+                            .ToolTip(t.Message(new("App", "RefreshDevices")))
+                            .IsEnabled(!sendMutation.IsPending)) with
+                    {
+                        AlignItems = FlexAlign.Center,
+                        ColumnGap = 8,
+                    },
+                    deviceContent) with
+                {
+                    RowGap = 12,
+                }))
+            .VAlign(VerticalAlignment.Stretch)
+            .Flex(grow: 1, shrink: 1, basis: 320);
+
+        var contentCards = (FlexRow(selectedItemsCard, nearbyDevicesCard) with
+            {
+                AlignItems = FlexAlign.Stretch,
+                AlignContent = FlexAlign.Stretch,
+                ColumnGap = 16,
+                RowGap = 16,
+                Wrap = FlexWrap.Wrap,
+            })
+            .VAlign(VerticalAlignment.Stretch)
+            .Flex(grow: 1, basis: 0);
+
+        var page = (FlexColumn(
             Heading(t.Message(new("App", "SendTitle")))
                 .HeadingLevel(AutomationHeadingLevel.Level1),
             VStack(12,
                 Subtitle(t.Message(new("App", "ChooseContent")))
                     .HeadingLevel(AutomationHeadingLevel.Level2),
-                selectionGrid,
-                selectedContent),
-            TransferPanel(
-                transfer,
-                sendMutation.IsPending,
-                () =>
-                {
-                    sendCancellationRef.Current?.Cancel();
-                    updateTransfer(current => current with
+                selectionGrid),
+            transfer.State is null
+                ? null
+                : TransferPanel(
+                    transfer,
+                    sendMutation.IsPending,
+                    () =>
                     {
-                        Message = t.Message(new("App", "CancellingTransfer")),
-                    });
-                },
-                t),
-            FlexRow(
-                Subtitle(t.Message(new("App", "NearbyDevices")))
-                    .HeadingLevel(AutomationHeadingLevel.Level2)
-                    .Flex(grow: 1, basis: 0),
-                Button(Icon("Refresh"), () => _ = Props.RefreshAsync())
-                    .AutomationName(t.Message(new("App", "RefreshDevices")))
-                    .ToolTip(t.Message(new("App", "RefreshDevices")))
-                    .IsEnabled(!sendMutation.IsPending)) with
-            {
-                AlignItems = FlexAlign.Center,
-                ColumnGap = 8,
-            },
-            ScrollView(deviceContent)
-                .HorizontalContentAlignment(HorizontalAlignment.Stretch)
-                .Flex(grow: 1, basis: 0),
+                        sendCancellationRef.Current?.Cancel();
+                        updateTransfer(current => current with
+                        {
+                            Message = t.Message(new("App", "CancellingTransfer")),
+                        });
+                    },
+                    t),
+            contentCards,
             TextDialog(),
             PinDialog(),
-            FavoriteDialog());
+            FavoriteDialog()) with
+            {
+                RowGap = 20,
+            });
 
         return Border(page)
             .Padding(36)
             .MaxWidth(1120)
             .HAlign(HorizontalAlignment.Stretch)
+            .VAlign(VerticalAlignment.Stretch)
             .Landmark(AutomationLandmarkType.Main);
 
         Element TextDialog() => ContentDialog(
@@ -763,7 +808,10 @@ sealed class SendPage : Component<SendPageProps>
                 .AutomationName(t.Message(new("App", "RemoveItem"), ("item", item.DisplayName)))
                 .ToolTip(t.Message(new("App", "Remove")))
                 .Grid(column: 2))
-        .Padding(8);
+        .Padding(12)
+        .CornerRadius(8)
+        .Background(Theme.SubtleFill)
+        .WithBorder(Theme.CardStroke, 1);
 
     private static Element DeviceCard(
         LocalSendDevice device,
@@ -878,7 +926,7 @@ sealed class SendPage : Component<SendPageProps>
 
     private static Element EmptyDevices(IntlAccessor t, LocalSendNodeState state, string? discoveryWarning) =>
         FlexColumn(
-            Icon(state == LocalSendNodeState.Faulted ? "Important" : "Find").AccessibilityHidden(),
+            Icon(FontIcon("\uE721", fontSize: 48)).AccessibilityHidden(),
             Subtitle(state == LocalSendNodeState.Faulted
                 ? t.Message(new("App", "NetworkStartFailed"))
                 : t.Message(new("App", "SearchingDevices"))),

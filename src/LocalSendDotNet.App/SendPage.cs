@@ -4,6 +4,7 @@ using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Controls.Validation;
 using Microsoft.UI.Reactor.Layout;
 using Microsoft.UI.Reactor.Localization;
+using Microsoft.UI.Reactor.Navigation;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.UI.Xaml;
@@ -84,7 +85,11 @@ sealed class SendPage : Component<SendPageProps>
         var (transfer, updateTransfer) = UseReducer(TransferUiState.Idle(
             t.Message(new("App", "SendHint"))));
         var sendCancellationRef = UseRef<CancellationTokenSource?>(null);
+        var searchingPlayerRef = UseRef<AnimatedVisualPlayer?>(null);
         var shareTargetPayloadId = Props.ShareTargetPayload?.Id ?? Guid.Empty;
+
+        UseNavigationLifecycle(onNavigatedTo: _ =>
+            PlaySearchingAnimation(searchingPlayerRef.Current));
 
         UseEffect(() =>
         {
@@ -197,7 +202,11 @@ sealed class SendPage : Component<SendPageProps>
 
         var devices = Props.Runtime.Devices;
         Element deviceBody = devices.Count == 0
-            ? EmptyDevices(t, Props.Runtime.NodeState, Props.Runtime.DiscoveryWarning)
+            ? EmptyDevices(
+                    t,
+                    Props.Runtime.NodeState,
+                    Props.Runtime.DiscoveryWarning,
+                    SearchingDevicesAnimation())
                 .VAlign(VerticalAlignment.Stretch)
             : VStack(8,
                 devices.Select((device, index) =>
@@ -278,6 +287,27 @@ sealed class SendPage : Component<SendPageProps>
             .HAlign(HorizontalAlignment.Stretch)
             .VAlign(VerticalAlignment.Stretch)
             .Landmark(AutomationLandmarkType.Main);
+
+        Element SearchingDevicesAnimation() =>
+            (AnimatedVisualPlayer() with { AutoPlay = false })
+                .Size(144, 144)
+                .AccessibilityHidden()
+                .OnMountAdd(element =>
+                {
+                    if (element is not AnimatedVisualPlayer player)
+                        return;
+
+                    searchingPlayerRef.Current = player;
+                    PlaySearchingAnimation(player);
+                })
+                .OnUnmountAdd(element =>
+                {
+                    if (element is AnimatedVisualPlayer player
+                        && ReferenceEquals(searchingPlayerRef.Current, player))
+                    {
+                        searchingPlayerRef.Current = null;
+                    }
+                });
 
         Element TextDialog() => ContentDialog(
             t.Message(new("App", "SendTextTitle")),
@@ -874,9 +904,15 @@ sealed class SendPage : Component<SendPageProps>
             .CornerRadius(4)
             .Background(Theme.SubtleFill);
 
-    private static Element EmptyDevices(IntlAccessor t, LocalSendNodeState state, string? discoveryWarning) =>
+    private static Element EmptyDevices(
+        IntlAccessor t,
+        LocalSendNodeState state,
+        string? discoveryWarning,
+        Element searchingAnimation) =>
         FlexColumn(
-            Icon(FontIcon("\uE721", fontSize: 48)).AccessibilityHidden(),
+            state == LocalSendNodeState.Faulted
+                ? Icon("Warning").AccessibilityHidden()
+                : searchingAnimation,
             Subtitle(state == LocalSendNodeState.Faulted
                 ? t.Message(new("App", "NetworkStartFailed"))
                 : t.Message(new("App", "SearchingDevices"))),
@@ -892,6 +928,15 @@ sealed class SendPage : Component<SendPageProps>
             AlignItems = FlexAlign.Center,
             JustifyContent = FlexJustify.Center,
         };
+
+    private static void PlaySearchingAnimation(AnimatedVisualPlayer? player)
+    {
+        if (player is null)
+            return;
+
+        player.Source = new SearchingDevices();
+        _ = player.PlayAsync(fromProgress: 0, toProgress: 1, looped: true);
+    }
 
     private static async Task<SelectedSendItem> FromStorageFileAsync(
         StorageFile file,

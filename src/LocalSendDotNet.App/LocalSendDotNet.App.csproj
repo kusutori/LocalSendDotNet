@@ -82,6 +82,9 @@
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
         <PackageReference Include="CommunityToolkit.WinUI.Controls.Segmented" />
+        <PackageReference Include="LottieGen.MsBuild"
+                          GeneratePathProperty="true"
+                          PrivateAssets="all" />
         <PackageReference Include="Microsoft.Graphics.Win2D" />
         <PackageReference Include="Microsoft.WindowsAppSDK" />
         <PackageReference Include="Microsoft.UI.Reactor" />
@@ -98,8 +101,54 @@
               Link="Strings\%(RecursiveDir)%(Filename)%(Extension)" />
         <Content Include="Assets\AppIcon.svg" CopyToOutputDirectory="PreserveNewest" />
         <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
-        <Content Include="Assets\SplashLogo.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
+
+    <PropertyGroup>
+        <_LottieGeneratedCodeDirectory>$(BaseIntermediateOutputPath)$(Configuration)\$(Platform)\Lottie\</_LottieGeneratedCodeDirectory>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <LottieAnimation Include="Assets\SplashLogo.json" />
+        <LottieAnimation Include="Search\SearchingDevices.json" />
+    </ItemGroup>
+
+    <Target Name="_GenerateLottieSources"
+            Inputs="@(LottieAnimation)"
+            Outputs="@(LottieAnimation->'$(_LottieGeneratedCodeDirectory)%(Filename).cs')">
+        <MakeDir Directories="$(_LottieGeneratedCodeDirectory)" />
+        <LottieGen.Task.LottieGen
+            InputFile="%(LottieAnimation.FullPath)"
+            Language="cs"
+            Namespace="LocalSendDotNet"
+            OutputFolder="$(_LottieGeneratedCodeDirectory)"
+            Public="true"
+            WinUIVersion="3.0" />
+    </Target>
+
+    <!-- LottieGen 8.2 does not mark its WinRT interface implementers partial,
+         which CsWinRT requires for trimming and Native AOT. Keep this automatic
+         and incremental so no checked-in generated source or manual script is needed. -->
+    <Target Name="_PrepareGeneratedLottieSourcesForAot"
+            DependsOnTargets="_GenerateLottieSources"
+            Inputs="@(LottieAnimation->'$(_LottieGeneratedCodeDirectory)%(Filename).cs')"
+            Outputs="@(LottieAnimation->'$(_LottieGeneratedCodeDirectory)%(Filename).partial.stamp')">
+        <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;$path = '$(_LottieGeneratedCodeDirectory)%(LottieAnimation.Filename).cs'; $text = [IO.File]::ReadAllText($path); $text = $text.Replace('sealed class ', 'sealed partial class '); [IO.File]::WriteAllText($path, $text, (New-Object Text.UTF8Encoding($false)))&quot;" />
+        <Touch Files="$(_LottieGeneratedCodeDirectory)%(LottieAnimation.Filename).partial.stamp"
+               AlwaysCreate="true" />
+    </Target>
+
+    <Target Name="_IncludeGeneratedLottieSources"
+            BeforeTargets="CoreCompile"
+            DependsOnTargets="_PrepareGeneratedLottieSourcesForAot">
+        <ItemGroup>
+            <Compile Include="@(LottieAnimation->'$(_LottieGeneratedCodeDirectory)%(Filename).cs')" />
+        </ItemGroup>
+    </Target>
+
+    <!-- The package predates SDK-style WinUI and places its registration under
+         build/win, which NuGet does not auto-import for net*-windows projects. -->
+    <Import Project="$(PkgLottieGen_MsBuild)\build\win\LottieGen.MsBuild.props"
+            Condition="Exists('$(PkgLottieGen_MsBuild)\build\win\LottieGen.MsBuild.props')" />
 
     <ItemGroup Condition="'$(LocalSendPackaged)' == 'true'">
         <AppxManifest Include="Package.appxmanifest">

@@ -256,13 +256,13 @@ sealed class SendPage : Component<SendPageProps>
             .Flex(grow: 1, shrink: 1, basis: 320);
 
         var contentCards = (FlexRow(selectedItemsCard, nearbyDevicesCard) with
-            {
-                AlignItems = FlexAlign.Stretch,
-                AlignContent = FlexAlign.Stretch,
-                ColumnGap = 16,
-                RowGap = 16,
-                Wrap = FlexWrap.Wrap,
-            })
+        {
+            AlignItems = FlexAlign.Stretch,
+            AlignContent = FlexAlign.Stretch,
+            ColumnGap = 16,
+            RowGap = 16,
+            Wrap = FlexWrap.Wrap,
+        })
             .VAlign(VerticalAlignment.Stretch)
             .Flex(grow: 1, basis: 0);
 
@@ -277,9 +277,9 @@ sealed class SendPage : Component<SendPageProps>
             TextDialog(),
             PinDialog(),
             FavoriteDialog()) with
-            {
-                RowGap = 20,
-            });
+        {
+            RowGap = 20,
+        });
 
         return Border(page)
             .Padding(36)
@@ -806,7 +806,7 @@ sealed class SendPage : Component<SendPageProps>
         Grid(
             columns: [GridSize.Auto, GridSize.Star(), GridSize.Auto],
             rows: [GridSize.Auto],
-            Icon(ItemIcon(item.Kind)).AccessibilityHidden()
+            Icon(ItemIcon(item)).AccessibilityHidden()
                 .VAlign(VerticalAlignment.Center)
                 .Grid(column: 0),
             VStack(2,
@@ -1083,12 +1083,12 @@ sealed class SendPage : Component<SendPageProps>
             : "#—";
     }
 
-    private static string ItemIcon(string kind) => kind switch
+    private static string ItemIcon(SelectedSendItem item) => item.Kind switch
     {
         "text" => "Edit",
         "clipboard" => "Paste",
         "folder" => "Folder",
-        _ => "Document",
+        _ => FileTypeGlyphs.ForFileName(item.DisplayName),
     };
 
     private static string ItemKindLabel(IntlAccessor t, string kind) => kind switch

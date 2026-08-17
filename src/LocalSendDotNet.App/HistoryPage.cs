@@ -182,7 +182,7 @@ sealed class HistoryPage : Component<HistoryPageProps>
             TextBlock(value).TextWrapping(TextWrapping.WrapWholeWords));
 
     private static string HistoryIcon(string path) =>
-        Directory.Exists(path) ? "Folder" : "Document";
+        Directory.Exists(path) ? "Folder" : FileTypeGlyphs.ForFileName(path);
 
     private static bool PathExists(string path) =>
         !string.IsNullOrWhiteSpace(path) && (File.Exists(path) || Directory.Exists(path));

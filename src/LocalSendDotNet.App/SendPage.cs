@@ -264,20 +264,6 @@ sealed class SendPage : Component<SendPageProps>
                 Subtitle(t.Message(new("App", "ChooseContent")))
                     .HeadingLevel(AutomationHeadingLevel.Level2),
                 selectionGrid),
-            transfer.State is null
-                ? null
-                : TransferPanel(
-                    transfer,
-                    sendMutation.IsPending,
-                    () =>
-                    {
-                        sendCancellationRef.Current?.Cancel();
-                        updateTransfer(current => current with
-                        {
-                            Message = t.Message(new("App", "CancellingTransfer")),
-                        });
-                    },
-                    t),
             contentCards,
             TextDialog(),
             PinDialog(),
@@ -888,42 +874,6 @@ sealed class SendPage : Component<SendPageProps>
             .CornerRadius(4)
             .Background(Theme.SubtleFill);
 
-    private static Element TransferPanel(
-        TransferUiState transfer,
-        bool isPending,
-        Action cancel,
-        IntlAccessor t)
-    {
-        if (transfer.State is null)
-            return Caption(transfer.Message).Foreground(Theme.SecondaryText);
-
-        var progress = transfer.TotalBytes <= 0
-            ? 0
-            : Math.Clamp(transfer.BytesTransferred * 100d / transfer.TotalBytes, 0, 100);
-        var progressText = $"{FormatBytes(transfer.BytesTransferred)} / {FormatBytes(transfer.TotalBytes)}";
-        return Card(
-            VStack(12,
-                FlexRow(
-                    VStack(4,
-                        BodyStrong(TransferTitle(t, transfer.State.Value)),
-                        TextBlock(transfer.Message)
-                            .Foreground(transfer.IsError ? Theme.SystemCritical : Theme.SecondaryText))
-                        .Flex(grow: 1, basis: 0),
-                    isPending
-                        ? Button(t.Message(new("App", "Cancel")), cancel)
-                            .AutomationName(t.Message(new("App", "CancelCurrentTransfer")))
-                        : null) with
-                {
-                    AlignItems = FlexAlign.Center,
-                    ColumnGap = 12,
-                },
-                transfer.State is TransferState.Preparing or TransferState.WaitingForAcceptance
-                    ? ProgressIndeterminate()
-                    : Progress(progress),
-                Caption(progressText)
-                    .Foreground(Theme.SecondaryText)));
-    }
-
     private static Element EmptyDevices(IntlAccessor t, LocalSendNodeState state, string? discoveryWarning) =>
         FlexColumn(
             Icon(FontIcon("\uE721", fontSize: 48)).AccessibilityHidden(),
@@ -1057,16 +1007,6 @@ sealed class SendPage : Component<SendPageProps>
         TransferState.Completed => t.Message(new("App", "SentToDevice"), ("device", deviceAlias)),
         TransferState.Cancelled => t.Message(new("App", "TransferCancelled")),
         _ => t.Message(new("App", "TransferFailed")),
-    };
-
-    private static string TransferTitle(IntlAccessor t, TransferState state) => state switch
-    {
-        TransferState.Preparing => t.Message(new("App", "TransferPreparing")),
-        TransferState.WaitingForAcceptance => t.Message(new("App", "TransferWaiting")),
-        TransferState.Transferring => t.Message(new("App", "TransferTransferring")),
-        TransferState.Completed => t.Message(new("App", "TransferComplete")),
-        TransferState.Cancelled => t.Message(new("App", "Cancelled")),
-        _ => t.Message(new("App", "SendFailed")),
     };
 
     private static string DeviceIcon(LocalSendDeviceType type) => type switch

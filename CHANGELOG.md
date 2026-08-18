@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-preview.4
+
+- Update package and repository metadata for the Tonarink repository.
+- Add a dedicated Core README and ship the Core API and compatibility documentation inside the NuGet package.
+- Validate the packaged documentation before publishing through NuGet Trusted Publishing.
+
 ## 0.2.0-preview.3
 
 - Keep the HTTP server running when multicast UDP cannot bind, for example on Windows excluded-port ranges.

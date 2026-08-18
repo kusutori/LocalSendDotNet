@@ -5,8 +5,9 @@ GitHub Releases ship a standard AppPackages sideload ZIP for each architecture
 The ZIP contains `Install.ps1`, the `.msix`, and the matching certificate.
 
 1. Download the ZIP that matches the computer: `x64` for Intel/AMD PCs, `ARM64`
-   for Windows on Arm. Native AOT MSIX ZIPs are not published yet; use the
-   managed MSIX ZIP to install, or the portable AOT ZIP to run unpackaged.
+   for Windows on Arm. The standard `-msix.zip` build is recommended for most
+   users; `-aot-msix.zip` installs the Native AOT variant, while
+   `-portable.zip` runs without installation.
 2. Extract the archive.
 3. In the extracted `*_Test` folder, run `Install.ps1` (or
    `Add-AppDevPackage.ps1`). The script installs the certificate if needed and

@@ -80,9 +80,10 @@ instead of the native executable (~26 MB), and the resulting app white-screens
 and crashes.
 
 Publish the unpackaged Native AOT layout first, copy the stamped
-`Package.appxmanifest` in as `AppxManifest.xml`, then pack and sign with the
-Windows SDK tools (`makeappx` / `signtool`). Do not use `winapp package` for
-this layout.
+`Package.appxmanifest` in as `AppxManifest.xml`, set its processor architecture
+and replace the generated `$targetentrypoint$` placeholder with
+`Windows.FullTrustApplication`, then pack and sign with the Windows SDK tools
+(`makeappx` / `signtool`). Do not use `winapp package` for this layout.
 
 ```powershell
 dotnet publish src/Tonarink.App/Tonarink.App.csproj -c Release `
@@ -103,10 +104,10 @@ does not prevent the `.msix` application package from being created.
 ## GitHub Releases
 
 Pushing a numeric `app-vMAJOR.MINOR.PATCH` tag builds x64 and ARM64 Native AOT
-portable archives plus signed managed MSIX sideload ZIPs, then attaches them to
-the GitHub Release for that tag. Each MSIX ZIP is the standard `*_Test`
-AppPackages folder (`Install.ps1`, `Add-AppDevPackage.ps1`, `.msix`, and
-`.cer`). Native AOT MSIX packages are not published by CI yet. The separate
-prefix avoids triggering Core NuGet publication. The private key is supplied
-only through GitHub Actions Secrets. See [app-release-ci.md](app-release-ci.md)
-for setup and release instructions.
+portable archives, signed managed MSIX sideload ZIPs, and signed Native AOT MSIX
+sideload ZIPs, then attaches them to the GitHub Release for that tag. Managed
+MSIX ZIPs use the standard `*_Test` AppPackages layout; Native AOT MSIX ZIPs use
+the repository's lightweight sideload installer. The separate tag prefix avoids
+triggering Core NuGet publication. The private key is supplied only through
+GitHub Actions Secrets. See [app-release-ci.md](app-release-ci.md) for setup and
+release instructions.

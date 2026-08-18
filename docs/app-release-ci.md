@@ -1,15 +1,21 @@
 # Application GitHub Release CI
 
-The `App GitHub Release` workflow creates these Windows assets for x64 and ARM64:
+The `Tonarink GitHub Release` workflow creates these Windows assets for x64 and ARM64:
 
 - a self-contained Native AOT portable ZIP;
 - a separate native-symbols ZIP;
-- a signed managed MSIX sideload ZIP (`Tonarink-<version>-<platform>.zip`).
+- a signed managed MSIX sideload ZIP (`Tonarink-<version>-<platform>-msix.zip`);
+- a signed Native AOT MSIX sideload ZIP (`Tonarink-<version>-<platform>-aot-msix.zip`).
 
 Managed MSIX ZIPs are the standard Visual Studio `*_Test` AppPackages folder
-(`Install.ps1`, `Add-AppDevPackage.ps1`, `.msix`, `.cer`). Native AOT MSIX
-sideload ZIPs are temporarily omitted from GitHub Releases until that packaging
-path is reliable.
+(`Install.ps1`, `Add-AppDevPackage.ps1`, `.msix`, `.cer`). Native AOT MSIX ZIPs
+contain the hand-packed native layout, signed `.msix`, public certificate, and
+the repository's `Install-MsixSideload.ps1` as `Install.ps1`.
+
+Each generated GitHub Release begins with a bilingual Markdown table explaining
+the six application packages. Standard managed MSIX is recommended for most
+users; the portable and AOT MSIX variants are available for users who specifically
+want a native build. Symbol ZIPs are identified as debugging-only downloads.
 
 The workflow runs for tags in `app-vMAJOR.MINOR.PATCH` or
 `app-vMAJOR.MINOR.PATCH.REVISION` form and can also be started manually. The `app-`

@@ -186,7 +186,8 @@ jobs:
           THUMBPRINT: ${{ steps.certificate.outputs.thumbprint }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
         run: |
-          $archive = Join-Path $env:RUNNER_TEMP "Tonarink-$env:PACKAGE_VERSION-$env:PLATFORM.zip"
+          $releaseVersion = $env:PACKAGE_VERSION -replace '\.0$', ''
+          $archive = Join-Path $env:RUNNER_TEMP "Tonarink-$releaseVersion-$env:PLATFORM-msix.zip"
           $packageDir = Join-Path $env:RUNNER_TEMP 'AppPackages\'
           dotnet build $env:APP_PROJECT --no-restore -c Release `
             -p:Platform=$env:PLATFORM `
@@ -223,7 +224,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: signed-msix-${{ matrix.platform }}
-          path: ${{ runner.temp }}/Tonarink-${{ steps.package.outputs.version }}-${{ matrix.platform }}.zip
+          path: ${{ runner.temp }}/Tonarink-*-${{ matrix.platform }}-msix.zip
           if-no-files-found: error
 
       - name: Remove signing certificate
@@ -233,11 +234,202 @@ jobs:
           Remove-Item "Cert:\CurrentUser\My\${{ steps.certificate.outputs.thumbprint }}" -Force -ErrorAction SilentlyContinue
           Remove-Item "${{ steps.certificate.outputs.pfx }}" -Force -ErrorAction SilentlyContinue
 
+  signed-aot-msix:
+    name: Build signed Native AOT MSIX ${{ matrix.platform }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x64
+            rid: win-x64
+            architecture: x64
+          - platform: ARM64
+            rid: win-arm64
+            architecture: arm64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Validate signing configuration
+        shell: pwsh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MSIX_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MSIX_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64)) {
+            throw 'Missing GitHub Actions secret MSIX_CERTIFICATE_BASE64.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_PASSWORD)) {
+            throw 'Missing GitHub Actions secret MSIX_CERTIFICATE_PASSWORD.'
+          }
+
+      - name: Stamp package version
+        id: package
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          $packageVersion = ./build/Set-PackageIdentity.ps1 `
+            -ManifestPath $env:APP_MANIFEST `
+            -Tag $env:RELEASE_TAG
+          $releaseVersion = $env:RELEASE_TAG.Trim() -replace '^app-', '' -replace '^v', ''
+          "package_version=$packageVersion" >> $env:GITHUB_OUTPUT
+          "release_version=$releaseVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Import signing certificate
+        id: certificate
+        shell: pwsh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MSIX_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MSIX_CERTIFICATE_PASSWORD }}
+        run: |
+          [xml]$manifest = Get-Content -LiteralPath $env:APP_MANIFEST -Raw
+          $expectedPublisher = $manifest.Package.Identity.Publisher
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'release-signing.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
+          $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate `
+            -FilePath $certificatePath `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -Password $password
+          if ($certificate.Subject -ne $expectedPublisher) {
+            throw "Certificate subject '$($certificate.Subject)' does not match manifest publisher '$expectedPublisher'."
+          }
+          $publicCertificatePath = Join-Path $env:RUNNER_TEMP 'release-signing.cer'
+          Export-Certificate -Cert $certificate -FilePath $publicCertificatePath -Type CERT | Out-Null
+          Import-Certificate `
+            -FilePath $publicCertificatePath `
+            -CertStoreLocation Cert:\CurrentUser\TrustedPeople | Out-Null
+          "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
+          "pfx=$certificatePath" >> $env:GITHUB_OUTPUT
+          "cer=$publicCertificatePath" >> $env:GITHUB_OUTPUT
+
+      - name: Restore Native AOT application
+        run: >-
+          dotnet restore ${{ env.APP_PROJECT }}
+          -p:Platform=${{ matrix.platform }}
+          -p:NativeAot=true
+          -r ${{ matrix.rid }}
+
+      - name: Publish Native AOT layout
+        shell: pwsh
+        run: |
+          $layout = Join-Path $env:RUNNER_TEMP 'aot-msix-layout'
+          dotnet publish $env:APP_PROJECT --no-restore -c Release `
+            -r ${{ matrix.rid }} `
+            -p:Platform=${{ matrix.platform }} `
+            -p:NativeAot=true `
+            -p:TonarinkPackaged=false `
+            -p:WindowsPackageType=None `
+            -p:Version=${{ steps.package.outputs.release_version }} `
+            -o $layout
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Publishing the Native AOT layout failed.'
+          }
+
+          foreach ($requiredFile in @('Tonarink.exe', 'Tonarink.pri')) {
+            if (-not (Test-Path (Join-Path $layout $requiredFile))) {
+              throw "Native AOT layout is missing $requiredFile."
+            }
+          }
+
+          Get-ChildItem -LiteralPath $layout -Filter '*.pdb' -File |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+
+          $assets = Join-Path $layout 'Assets'
+          New-Item -ItemType Directory -Path $assets -Force | Out-Null
+          Copy-Item 'src/Tonarink.App/Assets/*.png' -Destination $assets
+          Copy-Item $env:APP_MANIFEST -Destination (Join-Path $layout 'AppxManifest.xml')
+
+          $manifestPath = Join-Path $layout 'AppxManifest.xml'
+          [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw
+          $manifest.Package.Identity.SetAttribute('ProcessorArchitecture', '${{ matrix.architecture }}')
+          $manifest.Package.Applications.Application.SetAttribute('EntryPoint', 'Windows.FullTrustApplication')
+          $settings = [Xml.XmlWriterSettings]::new()
+          $settings.Indent = $true
+          $settings.Encoding = [Text.UTF8Encoding]::new($false)
+          $writer = [Xml.XmlWriter]::Create($manifestPath, $settings)
+          try {
+            $manifest.Save($writer)
+          }
+          finally {
+            $writer.Dispose()
+          }
+
+      - name: Pack and sign Native AOT MSIX
+        shell: pwsh
+        env:
+          THUMBPRINT: ${{ steps.certificate.outputs.thumbprint }}
+        run: |
+          $sdkBinRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+          $sdkTools = Get-ChildItem -LiteralPath $sdkBinRoot -Directory |
+            Where-Object { Test-Path (Join-Path $_.FullName 'x64\makeappx.exe') } |
+            Sort-Object { [Version]$_.Name } -Descending |
+            Select-Object -First 1
+          if ($null -eq $sdkTools) {
+            throw 'A Windows SDK containing makeappx.exe and signtool.exe was not found.'
+          }
+
+          $makeAppx = Join-Path $sdkTools.FullName 'x64\makeappx.exe'
+          $signTool = Join-Path $sdkTools.FullName 'x64\signtool.exe'
+          $layout = Join-Path $env:RUNNER_TEMP 'aot-msix-layout'
+          $packageName = 'Tonarink-${{ steps.package.outputs.release_version }}-${{ matrix.platform }}-aot.msix'
+          $packagePath = Join-Path $env:RUNNER_TEMP $packageName
+
+          & $makeAppx pack /o /d $layout /p $packagePath
+          if ($LASTEXITCODE -ne 0) {
+            throw 'makeappx failed to create the Native AOT MSIX.'
+          }
+          & $signTool sign /fd SHA256 /s My /sha1 $env:THUMBPRINT $packagePath
+          if ($LASTEXITCODE -ne 0) {
+            throw 'signtool failed to sign the Native AOT MSIX.'
+          }
+          & $signTool verify /pa $packagePath
+          if ($LASTEXITCODE -ne 0) {
+            throw 'The Native AOT MSIX signature could not be verified.'
+          }
+
+          $packageFolder = Join-Path $env:RUNNER_TEMP "Tonarink_${{ steps.package.outputs.package_version }}_${{ matrix.platform }}_AOT_Test"
+          New-Item -ItemType Directory -Path $packageFolder | Out-Null
+          Copy-Item $packagePath -Destination $packageFolder
+          Copy-Item 'tools/Install-MsixSideload.ps1' -Destination (Join-Path $packageFolder 'Install.ps1')
+          Copy-Item 'docs/development-msix-install.md' -Destination (Join-Path $packageFolder 'README.md')
+          Copy-Item LICENSE, NOTICE -Destination $packageFolder
+          Copy-Item '${{ steps.certificate.outputs.cer }}' `
+            -Destination (Join-Path $packageFolder 'Tonarink-Development.cer')
+
+          $archive = Join-Path $env:RUNNER_TEMP 'Tonarink-${{ steps.package.outputs.release_version }}-${{ matrix.platform }}-aot-msix.zip'
+          Compress-Archive -Path $packageFolder -DestinationPath $archive -CompressionLevel Optimal
+
+      - name: Upload signed Native AOT package
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-aot-msix-${{ matrix.platform }}
+          path: ${{ runner.temp }}/Tonarink-${{ steps.package.outputs.release_version }}-${{ matrix.platform }}-aot-msix.zip
+          if-no-files-found: error
+
+      - name: Remove signing certificate
+        if: always() && steps.certificate.outputs.thumbprint != ''
+        shell: pwsh
+        run: |
+          Remove-Item "Cert:\CurrentUser\My\${{ steps.certificate.outputs.thumbprint }}" -Force -ErrorAction SilentlyContinue
+          Remove-Item "Cert:\CurrentUser\TrustedPeople\${{ steps.certificate.outputs.thumbprint }}" -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ steps.certificate.outputs.pfx }}" -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ steps.certificate.outputs.cer }}" -Force -ErrorAction SilentlyContinue
+
   release:
     name: Create GitHub Release
     needs:
       - portable
       - signed-msix
+      - signed-aot-msix
     runs-on: windows-latest
     steps:
       - name: Download release packages
@@ -254,10 +446,32 @@ jobs:
           path: packages
           merge-multiple: true
 
+      - name: Download signed Native AOT MSIX packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "signed-aot-msix-*"
+          path: packages
+          merge-multiple: true
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
           generate_release_notes: true
           prerelease: true
+          body: |
+            ## Choose a download / 下载选择
+
+            | Asset / 产物 | Architecture / 架构 | Recommended for / 适合场景 |
+            | --- | --- | --- |
+            | `Tonarink-<version>-x64-msix.zip` | x64 | **Recommended for most Intel/AMD Windows PCs.** Signed MSIX with the standard managed build. / 推荐大多数 Intel/AMD Windows 电脑使用。 |
+            | `Tonarink-<version>-ARM64-msix.zip` | ARM64 | **Recommended for Windows on Arm.** Signed MSIX with the standard managed build. / 推荐骁龙等 ARM64 Windows 设备使用。 |
+            | `Tonarink-<version>-x64-aot-msix.zip` | x64 | Installed Native AOT build with faster startup and no separate .NET runtime requirement. / 安装版 Native AOT。 |
+            | `Tonarink-<version>-ARM64-aot-msix.zip` | ARM64 | Native AOT MSIX for Windows on Arm. / ARM64 安装版 Native AOT。 |
+            | `Tonarink-<version>-x64-portable.zip` | x64 | Native AOT build that runs without installation. / 无需安装的 x64 便携版。 |
+            | `Tonarink-<version>-ARM64-portable.zip` | ARM64 | Native AOT build that runs without installation. / 无需安装的 ARM64 便携版。 |
+
+            Extract an MSIX ZIP and run `Install.ps1`. The included self-signed certificate is installed for sideloading. Files ending in `-symbols.zip` contain PDBs for debugging and are not application downloads.
+
+            解压 MSIX ZIP 后运行 `Install.ps1`；安装脚本会导入随附的自签名证书。`-symbols.zip` 仅包含调试符号，普通用户无需下载。
           files: packages/*

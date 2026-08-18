@@ -8,6 +8,6 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <ProjectReference Include="../../src/LocalSendDotNet.Core/LocalSendDotNet.Core.csproj" />
-    <None Include="../../docs/interop-matrix.md" Link="interop-matrix.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/LocalSendDotNet.Core/docs/interop-matrix.md" Link="interop-matrix.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

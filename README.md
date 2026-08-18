@@ -1,30 +1,44 @@
-# Tonarink and LocalSendDotNet
+# Tonarink
 
-Tonarink is an independent, unofficial Windows app implementing the LocalSend
-protocol. It interoperates with LocalSend devices, but is not affiliated with or
-endorsed by the official LocalSend project.
+Tonarink is an independent Windows app for fast, private file and text transfer
+over a local network. It is an unofficial implementation of the LocalSend
+protocol and interoperates with LocalSend-compatible devices.
 
-This repository also contains `LocalSendDotNet.Core`, the UI-independent .NET 10
-library that powers Tonarink. The library retains its protocol-oriented name and
-public API so existing NuGet consumers are not affected by the app brand.
+Tonarink is not affiliated with, endorsed by, or distributed by the official
+LocalSend project. The product name and user experience are independent; protocol
+compatibility is provided so users can communicate with the existing LocalSend
+ecosystem.
 
-## Current capabilities
+## Highlights
 
-- IPv4 multicast discovery and two-way registration
-- HTTP or HTTPS with persisted RSA identity, mutual TLS and certificate fingerprint pinning
-- File and text send/receive, partial acceptance, progress and cancellation
-- Optional receiver PIN protection
-- Safe streaming writes with path traversal protection and atomic publication
-- Session timeouts, bounded concurrency, SHA-256 verification and explicit transfer cancellation
-- Node lifecycle events, device expiry, trusted manual endpoints and stream-backed send items
-- Folder enumeration with relative paths and common MIME type inference
-- Diagnostic CLI for discovery and interoperability testing
+- Discover nearby LocalSend-compatible devices automatically
+- Send and receive files, folders, text, and clipboard content
+- Review incoming transfers and accept selected items
+- Follow transfer progress in the app and on the Windows taskbar
+- Use Windows Share to send files directly from File Explorer
+- Run from the system tray and choose Chinese or English at runtime
+- Use light, dark, or system appearance with Windows 11 materials
+- Install with MSIX or run the Native AOT portable build
 
-## Roadmap boundaries
+## Download
 
-The UI-ready v2 send/receive core is implemented. Browser sharing, IPv6 discovery and subnet scanning are later v2 extensions rather than UI blockers. Protocol v1 is legacy-only, transfer history belongs to the host application, and WebRTC work waits for a stable official v3 design.
+Prebuilt releases are available from [GitHub Releases](https://github.com/kusutori/Tonarink/releases).
+The MSIX sideload package and portable build are described in
+[the installation guide](docs/development-msix-install.md).
 
-## Build
+## LocalSendDotNet.Core
+
+Tonarink is powered by
+[LocalSendDotNet.Core](src/LocalSendDotNet.Core/README.md), the UI-independent
+.NET 10 implementation of the LocalSend v2.2 protocol maintained in this
+repository. It can also be consumed separately from NuGet by other .NET apps.
+
+The protocol library retains the `LocalSendDotNet.Core` package name and public
+API. Its usage guide, compatibility notes, interoperability matrix, and NuGet
+publishing documentation live with the project under
+[`src/LocalSendDotNet.Core`](src/LocalSendDotNet.Core).
+
+## Build from source
 
 ```powershell
 dotnet restore LocalSendDotNet.slnx
@@ -32,55 +46,18 @@ dotnet build LocalSendDotNet.slnx
 dotnet test LocalSendDotNet.slnx
 ```
 
-The Windows app project is `src/Tonarink.App/Tonarink.App.csproj`. Protocol and
-library projects continue to use the `LocalSendDotNet` name.
-
-## CLI
-
-```powershell
-dotnet run --project src/LocalSendDotNet.Cli -- discover
-dotnet run --project src/LocalSendDotNet.Cli -- listen --auto-accept
-dotnet run --project src/LocalSendDotNet.Cli -- send --target "Device Alias" path/to/file
-dotnet run --project src/LocalSendDotNet.Cli -- send-dir --target "Device Alias" --sha256 path/to/folder
-dotnet run --project src/LocalSendDotNet.Cli -- send-text --target "Device Alias" "hello"
-```
-
-## Core API
-
-```csharp
-await using var node = new LocalSendNode(new LocalSendOptions
-{
-    Alias = "My app",
-    DataDirectory = appDataDirectory,
-    DownloadDirectory = downloadsDirectory
-});
-
-await node.StartAsync(cancellationToken);
-await foreach (var request in node.WatchIncomingTransfersAsync(cancellationToken))
-{
-    _ = node.AcceptAsync(request.RequestId, progress: progress, cancellationToken: cancellationToken);
-}
-```
-
-See [docs/core-api.md](docs/core-api.md) for lifecycle, discovery, send/receive, cancellation and manual-address guidance.
-
-Windows Native AOT publishing and optional MSIX packaging are documented in
-[docs/packaging.md](docs/packaging.md).
-
-Tag-driven Native AOT and signed MSIX GitHub Releases are documented in
+The Windows app project is `src/Tonarink.App/Tonarink.App.csproj`. Packaging and
+release details are documented in [docs/packaging.md](docs/packaging.md) and
 [docs/app-release-ci.md](docs/app-release-ci.md).
 
-The tag-gated nuget.org release process for `LocalSendDotNet.Core` is documented
-in [docs/nuget-publishing.md](docs/nuget-publishing.md).
+## Relationship to LocalSend
 
-`samples/LocalSendDotNet.Sample` references the generated NuGet package rather than the source project. It is built in CI after packing to verify the consumer experience.
-
-Official-client evidence and the remaining manual scenarios are tracked in [docs/interop-matrix.md](docs/interop-matrix.md).
-
-The library requires the .NET 10 and ASP.NET Core 10 shared frameworks for framework-dependent deployments. Self-contained applications include these dependencies automatically.
+LocalSend established the open protocol and ecosystem that make Tonarink's
+cross-client interoperability possible. We thank the LocalSend project and its
+contributors for that work. Compatibility does not imply official status or
+endorsement; see [NOTICE](NOTICE) for attribution and further details.
 
 ## License
 
-Tonarink and LocalSendDotNet are licensed under [Apache-2.0](LICENSE).
-Attribution, acknowledgements, and the relationship to the separate official
-LocalSend project are documented in [NOTICE](NOTICE).
+Tonarink and LocalSendDotNet.Core are licensed under the
+[Apache License 2.0](LICENSE).

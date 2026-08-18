@@ -311,13 +311,13 @@ sealed class SettingsPage : Component<SettingsPageProps>
             VStack(0,
             HyperlinkButton(
                 t.Message(new("App", "SettingsAboutGitHub")),
-                new Uri("https://github.com/kusutori/LocalSendDotNet")),
+                new Uri("https://github.com/kusutori/Tonarink")),
             HyperlinkButton(
                 t.Message(new("App", "SettingsAboutLocalSend")),
                 new Uri("https://localsend.org")),
             HyperlinkButton(
                 t.Message(new("App", "SettingsAboutIssues")),
-                new Uri("https://github.com/kusutori/LocalSendDotNet/issues"))));
+                new Uri("https://github.com/kusutori/Tonarink/issues"))));
         var aboutSection = VStack(4,
             Subtitle(t.Message(new("App", "SettingsAbout")))
                 .HeadingLevel(AutomationHeadingLevel.Level2)
@@ -346,7 +346,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 .HAlign(HorizontalAlignment.Stretch),
             HyperlinkButton(
                 t.Message(new("App", "SettingsAboutFeedback")),
-                new Uri("https://github.com/kusutori/LocalSendDotNet/issues"))
+                new Uri("https://github.com/kusutori/Tonarink/issues"))
                 .HAlign(HorizontalAlignment.Left)
                 .Margin(top: 8));
 

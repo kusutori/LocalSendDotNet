@@ -15,7 +15,7 @@ owned by the nuget.org user or organization that will own this package:
 | Field | Value |
 | --- | --- |
 | Repository owner | `kusutori` |
-| Repository | `LocalSendDotNet` |
+| Repository | `Tonarink` |
 | Workflow file | `publish-nuget.yml` |
 | Environment | `release` |
 

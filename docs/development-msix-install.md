@@ -13,7 +13,7 @@ The ZIP contains `Install.ps1`, the `.msix`, and the matching certificate.
    then installs the package.
 
 Only install packages downloaded directly from the
-`kusutori/LocalSendDotNet` GitHub repository. Remove the development certificate
+`kusutori/Tonarink` GitHub repository. Remove the development certificate
 from the Local Machine **Trusted People** store when these builds are no longer
 needed.
 

@@ -333,8 +333,8 @@ Invoke-Git -Arguments @("push", "origin", $branch) | Out-Null
 Invoke-Git -Arguments @("push", "origin", $tagName) | Out-Null
 Write-Host "Pushed $branch and $tagName."
 if ($Project -eq "App") {
-    Write-Host "Release workflow: https://github.com/kusutori/LocalSendDotNet/actions"
+    Write-Host "Release workflow: https://github.com/kusutori/Tonarink/actions"
 }
 else {
-    Write-Host "NuGet publish workflow: https://github.com/kusutori/LocalSendDotNet/actions"
+    Write-Host "NuGet publish workflow: https://github.com/kusutori/Tonarink/actions"
 }

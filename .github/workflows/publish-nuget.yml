@@ -64,8 +64,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f "artifacts/nuget/LocalSendDotNet.Core.${{ steps.version.outputs.version }}.nupkg"
+          package="artifacts/nuget/LocalSendDotNet.Core.${{ steps.version.outputs.version }}.nupkg"
+          test -f "$package"
           test -f "artifacts/nuget/LocalSendDotNet.Core.${{ steps.version.outputs.version }}.snupkg"
+          for entry in \
+            README.md \
+            docs/core-api.md \
+            docs/compatibility.md \
+            docs/interop-matrix.md; do
+            unzip -Z1 "$package" | grep -Fx "$entry" >/dev/null || {
+              echo "NuGet package is missing $entry" >&2
+              exit 1
+            }
+          done
 
       - uses: actions/upload-artifact@v4
         with:

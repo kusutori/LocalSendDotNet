@@ -9,11 +9,11 @@
     <Authors>kusutori; LocalSendDotNet contributors</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/kusutori/LocalSendDotNet</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/kusutori/LocalSendDotNet</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/kusutori/Tonarink</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/kusutori/Tonarink</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>localsend;file-transfer;lan;discovery;dotnet</PackageTags>
-    <PackageReleaseNotes>https://github.com/kusutori/LocalSendDotNet/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/kusutori/Tonarink/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -21,12 +21,12 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" Condition="'$(CI)' == 'true'" />
-    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
     <None Include="../../LICENSE" Pack="true" PackagePath="/" />
     <None Include="../../NOTICE" Pack="true" PackagePath="/" />
-    <None Include="../../docs/core-api.md" Pack="true" PackagePath="docs/" />
-    <None Include="../../docs/compatibility.md" Pack="true" PackagePath="docs/" />
-    <None Include="../../docs/interop-matrix.md" Pack="true" PackagePath="docs/" />
+    <None Update="docs/core-api.md" Pack="true" PackagePath="/" />
+    <None Update="docs/compatibility.md" Pack="true" PackagePath="/" />
+    <None Update="docs/interop-matrix.md" Pack="true" PackagePath="/" />
     <None Include="../../CHANGELOG.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>

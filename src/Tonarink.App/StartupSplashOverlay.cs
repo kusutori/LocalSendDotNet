@@ -20,7 +20,7 @@ sealed class StartupSplashOverlay : Component
                     .Size(256, 256)
                     .HAlign(HorizontalAlignment.Center)
                     .VAlign(VerticalAlignment.Center)
-                    .AutomationName("LocalSend")
+                    .AutomationName("Tonarink")
                     .OnMountAdd(element =>
                     {
                         if (element is AnimatedVisualPlayer player)
@@ -35,7 +35,7 @@ sealed class StartupSplashOverlay : Component
         {
             try
             {
-                player.Source = new LocalSendDotNet.SplashLogo();
+                player.Source = new Tonarink.SplashLogo();
                 await player.PlayAsync(fromProgress: 0, toProgress: 1, looped: false);
             }
             catch

@@ -7,7 +7,7 @@ static class AppWindows
         var window = ReactorApp.OpenWindow(
             new WindowSpec
             {
-                Title = "LocalSend",
+                Title = "Tonarink",
                 Width = 1120,
                 Height = 760,
                 MinWidth = 360,

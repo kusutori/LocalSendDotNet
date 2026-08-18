@@ -8,9 +8,9 @@ using WinRtStorage = Windows.Storage;
 static class AppPlatform
 {
     public const string MinimizedArgument = "--minimized";
-    public const string StartupTaskId = "LocalSendStartup";
+    public const string StartupTaskId = "TonarinkStartup";
     private const string UnpackagedPublisher = "kusutori";
-    private const string UnpackagedProduct = "LocalSendDotNet";
+    private const string UnpackagedProduct = "Tonarink";
 
     private static readonly Lazy<string> DataDirectoryValue = new(ResolveDataDirectory);
     private static readonly Lazy<string> DefaultDownloadDirectoryValue = new(ResolveDefaultDownloadDirectory);

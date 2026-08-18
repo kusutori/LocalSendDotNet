@@ -1,7 +1,7 @@
 # Development MSIX installation
 
 GitHub Releases ship a standard AppPackages sideload ZIP for each architecture
-(`LocalSendDotNet-<version>-x64.zip` or `...-ARM64.zip`).
+(`Tonarink-<version>-x64.zip` or `...-ARM64.zip`).
 The ZIP contains `Install.ps1`, the `.msix`, and the matching certificate.
 
 1. Download the ZIP that matches the computer: `x64` for Intel/AMD PCs, `ARM64`

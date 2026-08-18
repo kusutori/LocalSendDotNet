@@ -4,7 +4,7 @@ The `App GitHub Release` workflow creates these Windows assets for x64 and ARM64
 
 - a self-contained Native AOT portable ZIP;
 - a separate native-symbols ZIP;
-- a signed managed MSIX sideload ZIP (`LocalSendDotNet-<version>-<platform>.zip`).
+- a signed managed MSIX sideload ZIP (`Tonarink-<version>-<platform>.zip`).
 
 Managed MSIX ZIPs are the standard Visual Studio `*_Test` AppPackages folder
 (`Install.ps1`, `Add-AppDevPackage.ps1`, `.msix`, `.cer`). Native AOT MSIX
@@ -34,7 +34,7 @@ Encode the PFX and copy the result without printing it to the terminal:
 ```
 
 The certificate subject must exactly match the `Publisher` in
-`src/LocalSendDotNet.App/Package.appxmanifest`. Never commit a PFX, its password, or
+`src/Tonarink.App/Package.appxmanifest`. Never commit a PFX, its password, or
 its Base64 representation. The workflow imports it into the temporary runner's
 Current User certificate store, removes the temporary PFX immediately, and removes
 the imported certificate after packaging.
@@ -48,7 +48,7 @@ repository root:
 ./tools/Publish-Release.ps1
 ```
 
-That bumps the app patch version in `LocalSendDotNet.App.csproj` and
+That bumps the app patch version in `Tonarink.App.csproj` and
 `Package.appxmanifest`, commits `Ship <version>`, and pushes `app-vMAJOR.MINOR.PATCH`.
 Use `-Bump Minor` or `-Version 0.2.0` to choose the next number, `-DryRun` to
 preview, and `-NoPush` to stop after the local commit and tag.

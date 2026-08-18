@@ -6,7 +6,7 @@ using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using static Microsoft.UI.Reactor.Factories;
-using static LocalSendDotNet.App.Controls.Toolkit.SegmentedElement;
+using static Tonarink.Controls.Toolkit.SegmentedElement;
 using static TransferOverlayVisuals;
 
 sealed record ReceivePageProps(

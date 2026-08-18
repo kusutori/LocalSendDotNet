@@ -934,7 +934,7 @@ sealed class SendPage : Component<SendPageProps>
         if (player is null)
             return;
 
-        player.Source = new SearchingDevices();
+        player.Source = new Tonarink.SearchingDevices();
         _ = player.PlayAsync(fromProgress: 0, toProgress: 1, looped: true);
     }
 

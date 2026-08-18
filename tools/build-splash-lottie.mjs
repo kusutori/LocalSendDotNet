@@ -361,7 +361,7 @@ const lottie = {
   markers: [{ tm: 56, cm: "settled", dr: 24 }],
 };
 
-const outPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "LocalSendDotNet.App", "Assets", "SplashLogo.json");
+const outPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "Tonarink.App", "Assets", "SplashLogo.json");
 writeFileSync(outPath, `${JSON.stringify(lottie)}\n`);
 console.log(`wrote ${outPath}`);
 console.log(`dashes=${dashes.length} order=${dashes.map((d) => d.index).join(",")}`);

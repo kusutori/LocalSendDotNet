@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Bump LocalSendDotNet versions, commit, tag, and push a release.
+    Bump Tonarink app or LocalSendDotNet.Core versions, commit, tag, and push a release.
 
 .DESCRIPTION
     Application releases update the app csproj and Package.appxmanifest, commit
@@ -44,8 +44,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-$appProject = Join-Path $repoRoot "src\LocalSendDotNet.App\LocalSendDotNet.App.csproj"
-$appManifest = Join-Path $repoRoot "src\LocalSendDotNet.App\Package.appxmanifest"
+$appProject = Join-Path $repoRoot "src\Tonarink.App\Tonarink.App.csproj"
+$appManifest = Join-Path $repoRoot "src\Tonarink.App\Package.appxmanifest"
 $coreProject = Join-Path $repoRoot "src\LocalSendDotNet.Core\LocalSendDotNet.Core.csproj"
 $packageProps = Join-Path $repoRoot "Directory.Packages.props"
 $changelog = Join-Path $repoRoot "CHANGELOG.md"
@@ -245,7 +245,7 @@ if ($Project -eq "App") {
     $files = @($appProject, $appManifest)
     $commitMessage = "Ship $newVersion"
     $tagName = "app-v$newVersion"
-    $tagMessage = "Application release $tagName"
+    $tagMessage = "Tonarink release $tagName"
 
     Write-Host "App  $current -> $newVersion  (MSIX $msixVersion)"
     Write-Host "Tag  $tagName"

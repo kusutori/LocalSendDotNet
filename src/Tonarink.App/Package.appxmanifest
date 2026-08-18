@@ -6,11 +6,11 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap5 rescap">
 
-  <Identity Name="LocalSendDotNet.App" Publisher="CN=kusutori" Version="0.1.7.0" />
+  <Identity Name="Tonarink.App" Publisher="CN=kusutori" Version="0.1.7.0" />
 
   <Properties>
-    <DisplayName>LocalSendDotNet</DisplayName>
-    <PublisherDisplayName>LocalSendDotNet</PublisherDisplayName>
+    <DisplayName>Tonarink</DisplayName>
+    <PublisherDisplayName>Tonarink</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -24,15 +24,15 @@
   </Resources>
 
   <Applications>
-    <Application Id="App" Executable="LocalSendDotNet.App.exe" EntryPoint="$targetentrypoint$">
+    <Application Id="App" Executable="Tonarink.exe" EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="LocalSendDotNet"
-        Description="Send files and text to nearby LocalSend devices."
+        DisplayName="Tonarink"
+        Description="An unofficial LocalSend-compatible app for nearby file and text transfers."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
         <uap:DefaultTile
-          ShortName="LocalSendDotNet"
+          ShortName="Tonarink"
           Square71x71Logo="Assets\Square71x71Logo.png"
           Wide310x150Logo="Assets\Wide310x150Logo.png"
           Square310x310Logo="Assets\Square310x310Logo.png" />
@@ -40,7 +40,7 @@
       </uap:VisualElements>
       <Extensions>
         <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="Send with LocalSend">
+          <uap:ShareTarget Description="Send with Tonarink">
             <uap:SupportedFileTypes>
               <uap:SupportsAnyFileType />
             </uap:SupportedFileTypes>
@@ -51,12 +51,12 @@
         </uap:Extension>
         <uap5:Extension
           Category="windows.startupTask"
-          Executable="LocalSendDotNet.App.exe"
+          Executable="Tonarink.exe"
           EntryPoint="Windows.FullTrustApplication">
           <uap5:StartupTask
-            TaskId="LocalSendStartup"
+            TaskId="TonarinkStartup"
             Enabled="false"
-            DisplayName="LocalSend" />
+            DisplayName="Tonarink" />
         </uap5:Extension>
       </Extensions>
     </Application>

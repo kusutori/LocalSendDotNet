@@ -8,8 +8,8 @@ using Windows.Storage;
 
 static class ShareTargetActivationBroker
 {
-    private const string InstanceKey = "LocalSendDotNet.Primary";
-    private const string IngestedEventName = @"Local\LocalSendDotNet.ShareIngested";
+    private const string InstanceKey = "Tonarink.Primary";
+    private const string IngestedEventName = @"Local\Tonarink.ShareIngested";
     private static readonly ConcurrentQueue<ShareTargetPayload> PendingPayloads = new();
     private static readonly EventWaitHandle Ingested = new(
         initialState: true,

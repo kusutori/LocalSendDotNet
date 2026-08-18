@@ -112,7 +112,7 @@
   <data name="PinRequiredMessage" xml:space="preserve"><value>{device} requires a receive PIN.</value></data>
   <data name="PinRequiredTitle" xml:space="preserve"><value>PIN required</value></data>
   <data name="Port" xml:space="preserve"><value>Port</value></data>
-  <data name="PortInUseHint" xml:space="preserve"><value>Check whether port 53317 is in use by another LocalSend instance.</value></data>
+  <data name="PortInUseHint" xml:space="preserve"><value>Check whether port 53317 is in use by Tonarink or another LocalSend-compatible app.</value></data>
   <data name="PreparingForDevice" xml:space="preserve"><value>Preparing to send to {device}…</value></data>
   <data name="ReceiveCancelled" xml:space="preserve"><value>Receive cancelled.</value></data>
   <data name="ReceivedMessage" xml:space="preserve"><value>Sent you a message:</value></data>
@@ -147,6 +147,7 @@
   <data name="SettingsAdvancedDescription" xml:space="preserve"><value>Device type, port, encryption, and other network options.</value></data>
   <data name="SettingsAbout" xml:space="preserve"><value>About</value></data>
   <data name="SettingsAboutCopyright" xml:space="preserve"><value>© {year}. All rights reserved.</value></data>
+  <data name="SettingsAboutRelationship" xml:space="preserve"><value>Tonarink is an independent, unofficial implementation of the LocalSend protocol. It is not affiliated with or endorsed by the LocalSend project. Thanks to Tien Do Nam and the LocalSend contributors for creating and documenting the protocol.</value></data>
   <data name="SettingsAboutFeedback" xml:space="preserve"><value>Send feedback</value></data>
   <data name="SettingsAboutGitHub" xml:space="preserve"><value>GitHub repository</value></data>
   <data name="SettingsAboutIssues" xml:space="preserve"><value>Report an issue</value></data>
@@ -177,13 +178,13 @@
   <data name="SettingsNetwork" xml:space="preserve"><value>Network</value></data>
   <data name="SettingsNetworkInterfaces" xml:space="preserve"><value>Network interfaces</value></data>
   <data name="SettingsNetworkInterfacesAll" xml:space="preserve"><value>All</value></data>
-  <data name="SettingsNetworkInterfacesPlaceholder" xml:space="preserve"><value>Adapter filtering is not available yet. This page is a placeholder for choosing which network interfaces LocalSend uses.</value></data>
+  <data name="SettingsNetworkInterfacesPlaceholder" xml:space="preserve"><value>Adapter filtering is not available yet. This page is a placeholder for choosing which network interfaces Tonarink uses.</value></data>
   <data name="SettingsPort" xml:space="preserve"><value>Port</value></data>
-  <data name="SettingsPortDescription" xml:space="preserve"><value>TCP and UDP port used by the LocalSend server.</value></data>
+  <data name="SettingsPortDescription" xml:space="preserve"><value>TCP and UDP port used by Tonarink''s LocalSend-compatible service.</value></data>
   <data name="SettingsPortWarning" xml:space="preserve"><value>Custom port. Other devices still look for {port} unless they are changed too.</value></data>
   <data name="SettingsMulticast" xml:space="preserve"><value>Multicast</value></data>
   <data name="SettingsMulticastDescription" xml:space="preserve"><value>IPv4 multicast group used to announce this device.</value></data>
-  <data name="SettingsMulticastWarning" xml:space="preserve"><value>Custom multicast group. Other LocalSend devices expect {group} unless they are changed too.</value></data>
+  <data name="SettingsMulticastWarning" xml:space="preserve"><value>Custom multicast group. Other LocalSend-compatible devices expect {group} unless they are changed too.</value></data>
   <data name="SettingsMinimizeToTray" xml:space="preserve"><value>Minimize to the system tray when closing</value></data>
   <data name="SettingsMinimizeToTrayDescription" xml:space="preserve"><value>Keep receiving in the background when the main window closes.</value></data>
   <data name="SettingsReceive" xml:space="preserve"><value>Receive</value></data>
@@ -195,19 +196,19 @@
   <data name="SettingsStartServer" xml:space="preserve"><value>Start server</value></data>
   <data name="SettingsStopServer" xml:space="preserve"><value>Stop server</value></data>
   <data name="SettingsStartWithWindows" xml:space="preserve"><value>Start after signing in</value></data>
-  <data name="SettingsStartWithWindowsDescription" xml:space="preserve"><value>Run LocalSend automatically after signing in to Windows.</value></data>
-  <data name="StartupDisabledByPolicy" xml:space="preserve"><value>Windows policy is blocking LocalSend from starting at sign-in.</value></data>
-  <data name="StartupDisabledByUser" xml:space="preserve"><value>Startup was turned off in Windows Settings. Enable LocalSend there, then try again.</value></data>
+  <data name="SettingsStartWithWindowsDescription" xml:space="preserve"><value>Run Tonarink automatically after signing in to Windows.</value></data>
+  <data name="StartupDisabledByPolicy" xml:space="preserve"><value>Windows policy is blocking Tonarink from starting at sign-in.</value></data>
+  <data name="StartupDisabledByUser" xml:space="preserve"><value>Startup was turned off in Windows Settings. Enable Tonarink there, then try again.</value></data>
   <data name="StartupFailed" xml:space="preserve"><value>Could not update sign-in startup: {error}</value></data>
   <data name="TrayExit" xml:space="preserve"><value>Exit</value></data>
-  <data name="TrayOpen" xml:space="preserve"><value>Open LocalSend</value></data>
-  <data name="TrayTooltip" xml:space="preserve"><value>LocalSend</value></data>
+  <data name="TrayOpen" xml:space="preserve"><value>Open Tonarink</value></data>
+  <data name="TrayTooltip" xml:space="preserve"><value>Tonarink</value></data>
   <data name="SettingsTheme" xml:space="preserve"><value>Theme</value></data>
   <data name="SettingsThemeDescription" xml:space="preserve"><value>Choose the app''s light or dark appearance.</value></data>
   <data name="SettingsTitle" xml:space="preserve"><value>Settings</value></data>
   <data name="ShareTargetEmpty" xml:space="preserve"><value>The share did not contain any accessible files or text.</value></data>
   <data name="ShareTargetFailed" xml:space="preserve"><value>Could not add the shared content: {error}</value></data>
-  <data name="Tagline" xml:space="preserve"><value>Secure, fast local network transfers</value></data>
+  <data name="Tagline" xml:space="preserve"><value>An unofficial LocalSend-compatible app</value></data>
   <data name="TargetDevice" xml:space="preserve"><value>Target device</value></data>
   <data name="TargetRequiresPin" xml:space="preserve"><value>The target device requires a PIN.</value></data>
   <data name="Text" xml:space="preserve"><value>Text</value></data>

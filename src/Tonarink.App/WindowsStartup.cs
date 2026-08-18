@@ -5,7 +5,7 @@ using Windows.System;
 static class WindowsStartup
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string RunValueName = "LocalSendDotNet";
+    private const string RunValueName = "Tonarink";
 
     public static async Task<bool> IsEnabledAsync()
     {

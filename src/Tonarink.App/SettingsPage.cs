@@ -9,8 +9,8 @@ using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
 using static Microsoft.UI.Reactor.Factories;
-using static LocalSendDotNet.App.Controls.Toolkit.SettingsCardElement;
-using static LocalSendDotNet.App.Controls.Toolkit.SettingsExpanderElement;
+using static Tonarink.Controls.Toolkit.SettingsCardElement;
+using static Tonarink.Controls.Toolkit.SettingsExpanderElement;
 
 sealed record SettingsPageProps(
     AppSettings Settings,
@@ -304,7 +304,11 @@ sealed class SettingsPage : Component<SettingsPageProps>
             ? $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}"
             : "dev";
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
-        var aboutLinks = VStack(0,
+        var aboutLinks = VStack(12,
+            TextBlock(t.Message(new("App", "SettingsAboutRelationship")))
+                .Foreground(Theme.SecondaryText)
+                .TextWrapping(TextWrapping.WrapWholeWords),
+            VStack(0,
             HyperlinkButton(
                 t.Message(new("App", "SettingsAboutGitHub")),
                 new Uri("https://github.com/kusutori/LocalSendDotNet")),
@@ -313,7 +317,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 new Uri("https://localsend.org")),
             HyperlinkButton(
                 t.Message(new("App", "SettingsAboutIssues")),
-                new Uri("https://github.com/kusutori/LocalSendDotNet/issues")));
+                new Uri("https://github.com/kusutori/LocalSendDotNet/issues"))));
         var aboutSection = VStack(4,
             Subtitle(t.Message(new("App", "SettingsAbout")))
                 .HeadingLevel(AutomationHeadingLevel.Level2)
@@ -331,7 +335,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 ])
                 .Set(expander =>
                 {
-                    expander.Header = "LocalSend";
+                    expander.Header = "Tonarink";
                     expander.Description = t.Message(
                         new("App", "SettingsAboutCopyright"),
                         ("year", DateTime.Now.Year));

@@ -9,7 +9,7 @@ development loop.
 Publish the x64 build with the checked-in profile:
 
 ```powershell
-dotnet publish src/LocalSendDotNet.App/LocalSendDotNet.App.csproj `
+dotnet publish src/Tonarink.App/Tonarink.App.csproj `
   -p:PublishProfile=win-x64-aot
 ```
 
@@ -19,7 +19,7 @@ For Windows on ARM64, use `win-arm64-aot` instead. Outputs are written under
 The equivalent one-off command is:
 
 ```powershell
-dotnet publish src/LocalSendDotNet.App/LocalSendDotNet.App.csproj -c Release `
+dotnet publish src/Tonarink.App/Tonarink.App.csproj -c Release `
   -r win-x64 -p:Platform=x64 -p:NativeAot=true `
   -o artifacts/publish/native-aot/win-x64
 ```
@@ -37,9 +37,9 @@ The application uses single-project MSIX packaging, following ReactorGallery. Th
 default build still has `WindowsPackageType=None`; opt into packaging with:
 
 ```powershell
-dotnet build src/LocalSendDotNet.App/LocalSendDotNet.App.csproj -c Release `
+dotnet build src/Tonarink.App/Tonarink.App.csproj -c Release `
   -p:Platform=x64 `
-  -p:LocalSendPackaged=true `
+  -p:TonarinkPackaged=true `
   -p:GenerateAppxPackageOnBuild=true
 ```
 
@@ -74,7 +74,7 @@ matching private key from `Cert:\CurrentUser\My` (or an exported PFX).
 ## Native AOT inside MSIX
 
 Native AOT and MSIX are independent choices. Do **not** pass
-`LocalSendPackaged=true` together with `NativeAot=true` on the same
+`TonarinkPackaged=true` together with `NativeAot=true` on the same
 `dotnet publish`: the MSIX targets then package the managed apphost (~600 KB)
 instead of the native executable (~26 MB), and the resulting app white-screens
 and crashes.
@@ -85,16 +85,16 @@ Windows SDK tools (`makeappx` / `signtool`). Do not use `winapp package` for
 this layout.
 
 ```powershell
-dotnet publish src/LocalSendDotNet.App/LocalSendDotNet.App.csproj -c Release `
+dotnet publish src/Tonarink.App/Tonarink.App.csproj -c Release `
   -r win-x64 -p:Platform=x64 -p:NativeAot=true `
-  -p:LocalSendPackaged=false -p:WindowsPackageType=None `
+  -p:TonarinkPackaged=false -p:WindowsPackageType=None `
   -o artifacts/publish/native-aot/win-x64
 
-Copy-Item src/LocalSendDotNet.App/Package.appxmanifest `
+Copy-Item src/Tonarink.App/Package.appxmanifest `
   artifacts/publish/native-aot/win-x64/AppxManifest.xml
 
 makeappx pack /o /d artifacts/publish/native-aot/win-x64 `
-  /p artifacts/LocalSendDotNet-win-x64-aot.msix
+  /p artifacts/Tonarink-win-x64-aot.msix
 ```
 
 A missing `mspdbcmf.exe` only prevents generation of the optional symbol package; it

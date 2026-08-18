@@ -1,4 +1,4 @@
-name: App GitHub Release
+name: Tonarink GitHub Release
 
 on:
   push:
@@ -16,8 +16,8 @@ permissions:
   contents: write
 
 env:
-  APP_PROJECT: src/LocalSendDotNet.App/LocalSendDotNet.App.csproj
-  APP_MANIFEST: src/LocalSendDotNet.App/Package.appxmanifest
+  APP_PROJECT: src/Tonarink.App/Tonarink.App.csproj
+  APP_MANIFEST: src/Tonarink.App/Package.appxmanifest
 
 jobs:
   portable:
@@ -78,7 +78,7 @@ jobs:
             -p:Version=${{ steps.release.outputs.version }} `
             -o $publishDir
 
-          $requiredFiles = @('LocalSendDotNet.App.exe', 'LocalSendDotNet.App.pri')
+          $requiredFiles = @('Tonarink.exe', 'Tonarink.pri')
           foreach ($requiredFile in $requiredFiles) {
             if (-not (Test-Path (Join-Path $publishDir $requiredFile))) {
               throw "Publish output is missing $requiredFile."
@@ -89,19 +89,19 @@ jobs:
           }
 
           Copy-Item README.md, LICENSE, NOTICE -Destination $publishDir
-          $symbols = Get-Item (Join-Path $publishDir 'LocalSendDotNet.App.pdb')
-          $symbolsArchive = Join-Path $env:RUNNER_TEMP "LocalSendDotNet-${{ steps.release.outputs.version }}-${{ matrix.platform }}-symbols.zip"
+          $symbols = Get-Item (Join-Path $publishDir 'Tonarink.pdb')
+          $symbolsArchive = Join-Path $env:RUNNER_TEMP "Tonarink-${{ steps.release.outputs.version }}-${{ matrix.platform }}-symbols.zip"
           Compress-Archive -Path $symbols.FullName -DestinationPath $symbolsArchive -CompressionLevel Optimal
           Remove-Item $symbols.FullName -Force
 
-          $archive = Join-Path $env:RUNNER_TEMP "LocalSendDotNet-${{ steps.release.outputs.version }}-${{ matrix.platform }}-portable.zip"
+          $archive = Join-Path $env:RUNNER_TEMP "Tonarink-${{ steps.release.outputs.version }}-${{ matrix.platform }}-portable.zip"
           Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $archive -CompressionLevel Optimal
 
       - name: Upload portable package
         uses: actions/upload-artifact@v4
         with:
           name: portable-${{ matrix.platform }}
-          path: ${{ runner.temp }}/LocalSendDotNet-${{ steps.release.outputs.version }}-${{ matrix.platform }}-*.zip
+          path: ${{ runner.temp }}/Tonarink-${{ steps.release.outputs.version }}-${{ matrix.platform }}-*.zip
           if-no-files-found: error
 
   signed-msix:
@@ -176,7 +176,7 @@ jobs:
           dotnet restore ${{ env.APP_PROJECT }}
           -p:Platform=${{ matrix.platform }}
           -p:RuntimeIdentifier=${{ matrix.rid }}
-          -p:LocalSendPackaged=true
+          -p:TonarinkPackaged=true
 
       - name: Build signed MSIX
         shell: pwsh
@@ -186,12 +186,12 @@ jobs:
           THUMBPRINT: ${{ steps.certificate.outputs.thumbprint }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
         run: |
-          $archive = Join-Path $env:RUNNER_TEMP "LocalSendDotNet-$env:PACKAGE_VERSION-$env:PLATFORM.zip"
+          $archive = Join-Path $env:RUNNER_TEMP "Tonarink-$env:PACKAGE_VERSION-$env:PLATFORM.zip"
           $packageDir = Join-Path $env:RUNNER_TEMP 'AppPackages\'
           dotnet build $env:APP_PROJECT --no-restore -c Release `
             -p:Platform=$env:PLATFORM `
             -p:RuntimeIdentifier=$env:RID `
-            -p:LocalSendPackaged=true `
+            -p:TonarinkPackaged=true `
             -p:GenerateAppxPackageOnBuild=true `
             -p:GenerateTestArtifacts=true `
             -p:AppxPackageSigningEnabled=true `
@@ -223,7 +223,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: signed-msix-${{ matrix.platform }}
-          path: ${{ runner.temp }}/LocalSendDotNet-${{ steps.package.outputs.version }}-${{ matrix.platform }}.zip
+          path: ${{ runner.temp }}/Tonarink-${{ steps.package.outputs.version }}-${{ matrix.platform }}.zip
           if-no-files-found: error
 
       - name: Remove signing certificate

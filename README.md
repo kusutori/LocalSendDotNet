@@ -1,6 +1,12 @@
-# LocalSendDotNet
+# Tonarink and LocalSendDotNet
 
-An experimental, UI-independent .NET 10 implementation of the LocalSend v2.2 protocol.
+Tonarink is an independent, unofficial Windows app implementing the LocalSend
+protocol. It interoperates with LocalSend devices, but is not affiliated with or
+endorsed by the official LocalSend project.
+
+This repository also contains `LocalSendDotNet.Core`, the UI-independent .NET 10
+library that powers Tonarink. The library retains its protocol-oriented name and
+public API so existing NuGet consumers are not affected by the app brand.
 
 ## Current capabilities
 
@@ -25,6 +31,9 @@ dotnet restore LocalSendDotNet.slnx
 dotnet build LocalSendDotNet.slnx
 dotnet test LocalSendDotNet.slnx
 ```
+
+The Windows app project is `src/Tonarink.App/Tonarink.App.csproj`. Protocol and
+library projects continue to use the `LocalSendDotNet` name.
 
 ## CLI
 
@@ -72,6 +81,6 @@ The library requires the .NET 10 and ASP.NET Core 10 shared frameworks for frame
 
 ## License
 
-LocalSendDotNet is licensed under [Apache-2.0](LICENSE). Attribution and the
-relationship to the separate official LocalSend project are documented in
-[NOTICE](NOTICE).
+Tonarink and LocalSendDotNet are licensed under [Apache-2.0](LICENSE).
+Attribution, acknowledgements, and the relationship to the separate official
+LocalSend project are documented in [NOTICE](NOTICE).

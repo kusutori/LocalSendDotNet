@@ -232,7 +232,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             };
         }, serverDesired, serverEpoch);
 
-        var titleBar = (TitleBar("LocalSend") with
+        var titleBar = (TitleBar("Tonarink") with
         {
             Subtitle = t.Message(new("App", "Tagline")),
             RightHeader = Caption(NodeStatusText(t, runtime.NodeState, runtime.DiscoveryWarning))

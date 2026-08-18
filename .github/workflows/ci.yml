@@ -30,6 +30,6 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
-      - run: dotnet restore src/LocalSendDotNet.App/LocalSendDotNet.App.csproj -p:Platform=x64
-      - run: dotnet format src/LocalSendDotNet.App/LocalSendDotNet.App.csproj --no-restore --verify-no-changes
-      - run: dotnet build src/LocalSendDotNet.App/LocalSendDotNet.App.csproj --no-restore --configuration Release -p:Platform=x64
+      - run: dotnet restore src/Tonarink.App/Tonarink.App.csproj -p:Platform=x64
+      - run: dotnet format src/Tonarink.App/Tonarink.App.csproj --no-restore --verify-no-changes
+      - run: dotnet build src/Tonarink.App/Tonarink.App.csproj --no-restore --configuration Release -p:Platform=x64

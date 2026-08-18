@@ -25,7 +25,7 @@ On tray right-click, build an `HMENU` and show it with `TrackPopupMenuEx`
 `XamlRoot` is required.
 
 - Look: classic shell context menu.
-- Code we validated: `src/LocalSendDotNet.App/TrayContextMenu.cs`
+- Code we validated: `src/Tonarink.App/TrayContextMenu.cs`
   (commit `2d548c2`).
 - Use this when you want zero extra packages and maximum reliability.
 

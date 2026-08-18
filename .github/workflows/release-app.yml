@@ -306,7 +306,7 @@ jobs:
           Export-Certificate -Cert $certificate -FilePath $publicCertificatePath -Type CERT | Out-Null
           Import-Certificate `
             -FilePath $publicCertificatePath `
-            -CertStoreLocation Cert:\CurrentUser\TrustedPeople | Out-Null
+            -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
           "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
           "pfx=$certificatePath" >> $env:GITHUB_OUTPUT
           "cer=$publicCertificatePath" >> $env:GITHUB_OUTPUT
@@ -420,7 +420,7 @@ jobs:
         shell: pwsh
         run: |
           Remove-Item "Cert:\CurrentUser\My\${{ steps.certificate.outputs.thumbprint }}" -Force -ErrorAction SilentlyContinue
-          Remove-Item "Cert:\CurrentUser\TrustedPeople\${{ steps.certificate.outputs.thumbprint }}" -Force -ErrorAction SilentlyContinue
+          Remove-Item "Cert:\CurrentUser\Root\${{ steps.certificate.outputs.thumbprint }}" -Force -ErrorAction SilentlyContinue
           Remove-Item "${{ steps.certificate.outputs.pfx }}" -Force -ErrorAction SilentlyContinue
           Remove-Item "${{ steps.certificate.outputs.cer }}" -Force -ErrorAction SilentlyContinue
 

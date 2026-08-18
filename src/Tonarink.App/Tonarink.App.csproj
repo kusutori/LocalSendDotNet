@@ -1,4 +1,4 @@
-﻿﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <!-- Keep the normal build unpackaged; opt into MSIX with -p:TonarinkPackaged=true. -->

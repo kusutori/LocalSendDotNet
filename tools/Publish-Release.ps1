@@ -53,11 +53,18 @@ $defaultBranch = "main"
 
 function Read-TextFile([string]$Path) {
     $bytes = [System.IO.File]::ReadAllBytes($Path)
-    $hasBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+    $offset = 0
+    while ($bytes.Length -ge $offset + 3 -and
+           $bytes[$offset] -eq 0xEF -and
+           $bytes[$offset + 1] -eq 0xBB -and
+           $bytes[$offset + 2] -eq 0xBF) {
+        $offset += 3
+    }
+    $hasBom = $offset -gt 0
     $encoding = [System.Text.UTF8Encoding]::new($hasBom)
     [pscustomobject]@{
         Path = $Path
-        Text = $encoding.GetString($bytes)
+        Text = $encoding.GetString($bytes, $offset, $bytes.Length - $offset)
         Encoding = $encoding
     }
 }

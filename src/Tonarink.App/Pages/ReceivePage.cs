@@ -1,11 +1,17 @@
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using CommunityToolkit.WinUI.Controls;
+using LocalSendDotNet;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
+using Microsoft.UI.Reactor.Localization;
 using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using static Microsoft.UI.Reactor.Factories;
 using static Tonarink.Controls.Toolkit.SegmentedElement;
 using static TransferOverlayVisuals;
@@ -121,7 +127,15 @@ sealed class ReceivePage : Component<ReceivePageProps>
                             .SubtleButton()
                             .AutomationName(t.Message(new("App", "HistoryOpenReceiveHistory")))
                             .MinWidth(40)
-                            .MinHeight(40))
+                            .MinHeight(40),
+                        Button(Icon("\uF167"), null)
+                            .SubtleButton()
+                            .AutomationName(t.Message(new("App", "DeviceInfo")))
+                            .MinWidth(40)
+                            .MinHeight(40)
+                            .WithFlyout(ContentFlyout(
+                                DeviceInfoFlyout(t, alias, Props.Settings, identity),
+                                FlyoutPlacementMode.BottomEdgeAlignedRight)))
                     with
                 { AlignItems = FlexAlign.Center, ColumnGap = 8 },
                 identityPanel.Flex(grow: 1, basis: 0),
@@ -135,6 +149,76 @@ sealed class ReceivePage : Component<ReceivePageProps>
             .Landmark(AutomationLandmarkType.Main);
 
         return page;
+    }
+
+    private static Element DeviceInfoFlyout(
+        IntlAccessor t,
+        string alias,
+        AppSettings settings,
+        LocalSendIdentity? identity)
+    {
+        var addresses = LocalIpv4Addresses(settings);
+        var ipText = addresses.Count == 0
+            ? t.Message(new("App", "DeviceInfoNoAddress"))
+            : string.Join(Environment.NewLine, addresses);
+        var port = identity?.Port ?? settings.Port;
+
+        return (Grid(
+            columns: [GridSize.Auto, GridSize.Star()],
+            rows: [GridSize.Auto, GridSize.Auto, GridSize.Auto],
+            DeviceInfoLabel(t.Message(new("App", "DeviceInfoAlias"))).Grid(row: 0, column: 0),
+            DeviceInfoValue(alias).Grid(row: 0, column: 1),
+            DeviceInfoLabel(t.Message(new("App", "DeviceInfoIp"))).Grid(row: 1, column: 0),
+            DeviceInfoValue(ipText).Grid(row: 1, column: 1),
+            DeviceInfoLabel(t.Message(new("App", "DeviceInfoPort"))).Grid(row: 2, column: 0),
+            DeviceInfoValue(port.ToString()).Grid(row: 2, column: 1)) with
+        {
+            ColumnSpacing = 24,
+            RowSpacing = 8,
+        })
+            .MinWidth(280)
+            .Padding(8);
+    }
+
+    private static Element DeviceInfoLabel(string text) =>
+        TextBlock(text)
+            .Foreground(Theme.SecondaryText)
+            .VAlign(VerticalAlignment.Center);
+
+    private static Element DeviceInfoValue(string text) =>
+        TextBlock(text)
+            .TextAlignment(TextAlignment.Right)
+            .TextWrapping(TextWrapping.WrapWholeWords)
+            .HAlign(HorizontalAlignment.Right)
+            .VAlign(VerticalAlignment.Center);
+
+    private static IReadOnlyList<string> LocalIpv4Addresses(AppSettings settings)
+    {
+        var addresses = new List<string>();
+        foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (nic.OperationalStatus != OperationalStatus.Up
+                || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                continue;
+
+            var interfaceAddresses = nic.GetIPProperties().UnicastAddresses
+                .Select(static item => item.Address)
+                .Where(static address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
+                .Select(static address => address.ToString())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            if (interfaceAddresses.Length == 0)
+                continue;
+            if (NetworkAddressPatterns.IsInterfaceIgnored(
+                interfaceAddresses,
+                settings.NetworkWhitelist,
+                settings.NetworkBlacklist))
+                continue;
+
+            addresses.AddRange(interfaceAddresses);
+        }
+
+        return addresses.Distinct(StringComparer.Ordinal).ToArray();
     }
 
     private static void PlayIdleLogoAnimation(AnimatedVisualPlayer? player)

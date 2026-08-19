@@ -37,6 +37,11 @@
   <data name="Copy" xml:space="preserve"><value>Copy</value></data>
   <data name="CopyReceivedText" xml:space="preserve"><value>Copy received text</value></data>
   <data name="Decline" xml:space="preserve"><value>Decline</value></data>
+  <data name="DeviceInfo" xml:space="preserve"><value>Device information</value></data>
+  <data name="DeviceInfoAlias" xml:space="preserve"><value>Alias (device name):</value></data>
+  <data name="DeviceInfoIp" xml:space="preserve"><value>IP:</value></data>
+  <data name="DeviceInfoNoAddress" xml:space="preserve"><value>No address available</value></data>
+  <data name="DeviceInfoPort" xml:space="preserve"><value>Port:</value></data>
   <data name="DeviceDesktop" xml:space="preserve"><value>Desktop</value></data>
   <data name="DeviceHeadless" xml:space="preserve"><value>Headless device</value></data>
   <data name="DeviceMobile" xml:space="preserve"><value>Mobile device</value></data>

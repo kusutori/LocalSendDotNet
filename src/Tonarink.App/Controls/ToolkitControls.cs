@@ -4,6 +4,7 @@ using Microsoft.UI.Reactor.Wrappers;
 namespace Tonarink.Controls.Toolkit;
 
 [GenerateReactorWrapper(typeof(SettingsCard), RegisterAssembly = false)]
+[WrapElementSlot("HeaderIcon")]
 public partial record SettingsCardElement;
 
 [GenerateReactorWrapper(typeof(SettingsExpander), RegisterAssembly = false)]

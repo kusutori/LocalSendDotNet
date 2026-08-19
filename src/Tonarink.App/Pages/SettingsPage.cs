@@ -70,6 +70,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
             SettingsCard(
                 header: t.Message(new("App", "SettingsTheme")),
                 description: t.Message(new("App", "SettingsThemeDescription")),
+                headerIcon: HeaderGlyph("\uE771"),
                 isClickEnabled: false,
                 isActionIconVisible: false,
                 content:
@@ -82,6 +83,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
             SettingsCard(
                 header: t.Message(new("App", "SettingsLanguage")),
                 description: t.Message(new("App", "SettingsLanguageDescription")),
+                headerIcon: HeaderGlyph("\uF2B7"),
                 isClickEnabled: false,
                 isActionIconVisible: false,
                 content:
@@ -94,6 +96,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
             SettingsCard(
                 header: t.Message(new("App", "SettingsMinimizeToTray")),
                 description: t.Message(new("App", "SettingsMinimizeToTrayDescription")),
+                headerIcon: HeaderGlyph("\uED1A"),
                 isClickEnabled: false,
                 isActionIconVisible: false,
                 content:
@@ -102,6 +105,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
             SettingsCard(
                 header: t.Message(new("App", "SettingsStartWithWindows")),
                 description: t.Message(new("App", "SettingsStartWithWindowsDescription")),
+                headerIcon: HeaderGlyph("\uEC4A"),
                 isClickEnabled: false,
                 isActionIconVisible: false,
                 content:
@@ -113,10 +117,15 @@ sealed class SettingsPage : Component<SettingsPageProps>
             SettingsCard(
                 header: t.Message(new("App", "SettingsSaveLocation")),
                 description: Props.Settings.DownloadDirectory,
+                headerIcon: HeaderGlyph("\uE8B7"),
                 isClickEnabled: false,
                 isActionIconVisible: false,
                 content:
-                Button(t.Message(new("App", "Change")), () => _ = PickDownloadDirectoryAsync())
+                Button(
+                    HStack(8,
+                        Icon("\uE8DA").AccessibilityHidden(),
+                        TextBlock(t.Message(new("App", "Change")))),
+                    () => _ = PickDownloadDirectoryAsync())
                     .AutomationName(t.Message(new("App", "ChangeSaveLocation")))));
 
         var startOrRestartName = serverOnline
@@ -139,6 +148,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
                     ? t.Message(new("App", "DeviceServer"))
                     : t.Message(new("App", "SettingsServerOffline")),
                 description: serverDescription,
+                headerIcon: HeaderGlyph("\uE703"),
                 isClickEnabled: false,
                 isActionIconVisible: false,
                 content:
@@ -160,6 +170,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
             SettingsCard(
                 header: t.Message(new("App", "SettingsDeviceName")),
                 description: t.Message(new("App", "SettingsDeviceNameDescription")),
+                headerIcon: HeaderGlyph("\uE8AC"),
                 isClickEnabled: false,
                 isActionIconVisible: false,
                 content:
@@ -168,6 +179,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
                     .AutomationName(t.Message(new("App", "SettingsDeviceName")))
                     .MinWidth(240)),
             SettingsExpander(
+                headerIcon: HeaderGlyph("\uE756"),
                 items:
                 [
                     SettingsCard(
@@ -417,6 +429,9 @@ sealed class SettingsPage : Component<SettingsPageProps>
             }
         }
     }
+
+    private static Element HeaderGlyph(string glyph) =>
+        Icon(glyph).AccessibilityHidden();
 
     private static Element SettingsGroup(string title, params Element[] cards) =>
         VStack(4,

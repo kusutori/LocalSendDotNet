@@ -29,6 +29,7 @@
   <data name="ClipboardReadFailed" xml:space="preserve"><value>Could not read the clipboard: {error}</value></data>
   <data name="ClipboardText" xml:space="preserve"><value>Clipboard text</value></data>
   <data name="Close" xml:space="preserve"><value>Close</value></data>
+  <data name="Confirm" xml:space="preserve"><value>OK</value></data>
   <data name="ContentManyItems" xml:space="preserve"><value>{count} items</value></data>
   <data name="ContentOneFile" xml:space="preserve"><value>File {file}</value></data>
   <data name="ContentOneTextMessage" xml:space="preserve"><value>A text message</value></data>
@@ -243,6 +244,22 @@
   <data name="TransferTransferring" xml:space="preserve"><value>Transferring</value></data>
   <data name="TransferWaiting" xml:space="preserve"><value>Waiting for acceptance</value></data>
   <data name="WaitingForDevice" xml:space="preserve"><value>Waiting for {device} to accept…</value></data>
+  <data name="WebShareAccepted" xml:space="preserve"><value>Accepted</value></data>
+  <data name="WebShareAutoAccept" xml:space="preserve"><value>Auto accept requests</value></data>
+  <data name="WebShareCopy" xml:space="preserve"><value>Copy link</value></data>
+  <data name="WebShareEncryption" xml:space="preserve"><value>Encryption</value></data>
+  <data name="WebShareEncryptionHint" xml:space="preserve"><value>HTTPS uses this device's certificate. Browsers will warn that it is not trusted.</value></data>
+  <data name="WebShareNoRequests" xml:space="preserve"><value>No requests yet.</value></data>
+  <data name="WebShareOpenLink" xml:space="preserve"><value>Open this link in a browser:</value></data>
+  <data name="WebSharePinHint" xml:space="preserve"><value>PIN is "{pin}"</value></data>
+  <data name="WebSharePinTitle" xml:space="preserve"><value>PIN</value></data>
+  <data name="WebShareQr" xml:space="preserve"><value>QR code</value></data>
+  <data name="WebShareQrTitle" xml:space="preserve"><value>QR code</value></data>
+  <data name="WebShareRequests" xml:space="preserve"><value>Requests</value></data>
+  <data name="WebShareRequirePin" xml:space="preserve"><value>Require a PIN</value></data>
+  <data name="WebShareTitle" xml:space="preserve"><value>Share via link</value></data>
+  <data name="WebShareZoom" xml:space="preserve"><value>Show large link</value></data>
+  <data name="WebShareZoomTitle" xml:space="preserve"><value>Link</value></data>
   <data name="WantsToSendMessage" xml:space="preserve"><value>Wants to send you a message:</value></data>
   <data name="WindowUnavailable" xml:space="preserve"><value>The current Reactor window is unavailable.</value></data>
 </root>

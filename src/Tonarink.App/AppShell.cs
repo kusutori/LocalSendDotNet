@@ -119,6 +119,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         var (shareTargetPayload, setShareTargetPayload) = UseState<ShareTargetPayload?>(null);
         var (serverDesired, setServerDesired) = UseState(true);
         var (serverEpoch, updateServerEpoch) = UseReducer(0);
+        var (httpsOverride, setHttpsOverride) = UseState<bool?>(null);
         var nodeRef = UseRef<LocalSendNode?>(null);
         var drainingActivationsRef = UseRef(false);
         var trayIcon = UseRef<WinUIEx.TrayIcon?>(null);
@@ -236,7 +237,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                     }
                 }
             };
-        }, serverDesired, serverEpoch);
+        }, serverDesired, serverEpoch, httpsOverride);
 
         var titleBar = (TitleBar("Tonarink") with
         {
@@ -277,6 +278,11 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 .WithKey($"settings:{Props.Locale}"),
             AppRoute.NetworkInterfaces => Component<NetworkInterfacesPage, NetworkInterfacesPageProps>(
                 new(settings, updateSettings)),
+            AppRoute.WebShare => Component<WebSharePage, WebSharePageProps>(new(
+                nodeRef.Current,
+                runtime,
+                settings,
+                SetHttpsOverride)),
             _ => TextBlock(t.Message(new("App", "PageNotFound"))),
         }) with
         {
@@ -447,6 +453,15 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
             updateServerEpoch(epoch => epoch + 1);
         }
 
+        void SetHttpsOverride(bool? value)
+        {
+            if (httpsOverride == value)
+                return;
+            setHttpsOverride(value);
+            if (serverDesired)
+                StartOrRestartServer();
+        }
+
         void StopServer()
         {
             if (!serverDesired && runtime.NodeState is LocalSendNodeState.Stopped
@@ -492,7 +507,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                     DataDirectory = AppPlatform.DataDirectory,
                     DownloadDirectory = settings.DownloadDirectory,
                     Port = settings.Port,
-                    EnableHttps = settings.EnableHttps,
+                    EnableHttps = httpsOverride ?? settings.EnableHttps,
                     MulticastAddress = settings.ResolvedMulticastAddress,
                     DiscoveryTimeout = TimeSpan.FromMilliseconds(Math.Max(1, settings.DiscoveryTimeoutMs)),
                     NetworkWhitelist = settings.NetworkWhitelist,
@@ -717,6 +732,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         AppRoute.Send => "send",
         AppRoute.Settings => "settings",
         AppRoute.NetworkInterfaces => "settings",
+        AppRoute.WebShare => "send",
         _ => "receive",
     };
 

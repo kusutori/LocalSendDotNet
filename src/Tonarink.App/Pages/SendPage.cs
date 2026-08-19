@@ -60,6 +60,7 @@ sealed class SendPage : Component<SendPageProps>
     {
         var t = UseIntl();
         var window = UseWindow();
+        var navigation = UseNavigation<AppRoute>();
         var (selectedItems, updateSelectedItems) = UseReducer<IReadOnlyList<SelectedSendItem>>(
             Array.Empty<SelectedSendItem>());
         var (pickerMessage, setPickerMessage) = UseState(t.Message(new("App", "NothingSelected")));
@@ -240,7 +241,23 @@ sealed class SendPage : Component<SendPageProps>
                         Button(Icon("Refresh"), () => _ = Props.RefreshAsync())
                             .AutomationName(t.Message(new("App", "RefreshDevices")))
                             .ToolTip(t.Message(new("App", "RefreshDevices")))
-                            .IsEnabled(!sendMutation.IsPending)) with
+                            .IsEnabled(!sendMutation.IsPending),
+                        Button(Icon("\uE71B"), () =>
+                        {
+                            if (selectedItems.Count == 0)
+                            {
+                                setPickerMessage(t.Message(new("App", "SelectContentFirst")));
+                                return;
+                            }
+                            if (Props.Node?.State != LocalSendNodeState.Running)
+                                return;
+                            WebShareLaunch.Items = selectedItems.Select(static item => item.Item).ToArray();
+                            navigation.Navigate(AppRoute.WebShare);
+                        })
+                            .AutomationName(t.Message(new("App", "WebShareTitle")))
+                            .ToolTip(t.Message(new("App", "WebShareTitle")))
+                            .IsEnabled(!sendMutation.IsPending
+                                && Props.Runtime.NodeState == LocalSendNodeState.Running)) with
                     {
                         AlignItems = FlexAlign.Center,
                         ColumnGap = 8,

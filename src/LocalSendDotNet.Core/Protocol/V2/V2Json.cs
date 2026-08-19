@@ -20,6 +20,8 @@ internal static class V2Json
 [JsonSerializable(typeof(PrepareUploadRequestDto))]
 [JsonSerializable(typeof(PrepareUploadResponseDto))]
 [JsonSerializable(typeof(ErrorResponseDto))]
+[JsonSerializable(typeof(PrepareDownloadResponseDto))]
+[JsonSerializable(typeof(PrepareDownloadFileDto))]
 internal sealed partial class V2JsonContext : JsonSerializerContext
 {
 }

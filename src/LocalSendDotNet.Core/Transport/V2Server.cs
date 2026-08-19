@@ -26,7 +26,8 @@ internal sealed class V2Server(
     Func<PrepareUploadRequestDto, IPAddress, string?, CancellationToken, Task<PrepareOutcome>> onPrepare,
     Func<string, string, string, IPAddress, Stream, long?, CancellationToken, Task<HttpStatusCode>> onUpload,
     Func<string, IPAddress, CancellationToken, Task<bool>> onCancel,
-    ILogger logger) : IAsyncDisposable
+    ILogger logger,
+    WebShareService webShare) : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<IPAddress, (int Count, DateTimeOffset LockedUntil)> _pinAttempts = new();
     private WebApplication? _application;
@@ -63,6 +64,9 @@ internal sealed class V2Server(
         app.MapPost(V2Constants.BasePath + "/prepare-upload", PrepareUploadAsync);
         app.MapPost(V2Constants.BasePath + "/upload", UploadAsync);
         app.MapPost(V2Constants.BasePath + "/cancel", CancelAsync);
+        app.MapGet("/", WebIndexAsync);
+        app.MapPost(V2Constants.BasePath + "/prepare-download", PrepareDownloadAsync);
+        app.MapGet(V2Constants.BasePath + "/download", DownloadAsync);
         _application = app;
         try { await app.StartAsync(cancellationToken).ConfigureAwait(false); }
         catch (Exception exception) when (ContainsAddressInUse(exception))
@@ -101,6 +105,95 @@ internal sealed class V2Server(
             Fingerprint = info.Fingerprint,
             Download = false
         }, V2JsonContext.Default.RegisterResponseDto, contentType: null, context.RequestAborted).ConfigureAwait(false);
+    }
+
+    private async Task WebIndexAsync(HttpContext context)
+    {
+        var state = webShare.Snapshot();
+        if (!state.Active)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        var html = WebShareHtml.Render(localInfo().Alias, state.Pin is not null);
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync(html, context.RequestAborted).ConfigureAwait(false);
+    }
+
+    private async Task PrepareDownloadAsync(HttpContext context)
+    {
+        try
+        {
+            var result = await webShare.PrepareAsync(
+                RemoteAddress(context),
+                context.Request.Headers.UserAgent.ToString(),
+                context.Request.Query["pin"].ToString(),
+                context.RequestAborted).ConfigureAwait(false);
+            if (result is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(result, V2JsonContext.Default.PrepareDownloadResponseDto, contentType: null, context.RequestAborted).ConfigureAwait(false);
+        }
+        catch (WebSharePinException)
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        }
+        catch (WebSharePinRateLimitedException)
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        }
+        catch (TimeoutException)
+        {
+            context.Response.StatusCode = StatusCodes.Status408RequestTimeout;
+        }
+    }
+
+    private async Task DownloadAsync(HttpContext context)
+    {
+        var sessionId = context.Request.Query["sessionId"].ToString();
+        var fileId = context.Request.Query["fileId"].ToString();
+        if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(fileId))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        try
+        {
+            var offered = await webShare.OpenFileAsync(
+                sessionId,
+                fileId,
+                RemoteAddress(context),
+                context.Request.Query["pin"].ToString(),
+                context.RequestAborted).ConfigureAwait(false);
+            if (offered is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            var (file, item) = offered.Value;
+            context.Response.ContentType = string.IsNullOrWhiteSpace(file.ContentType)
+                ? "application/octet-stream"
+                : file.ContentType;
+            context.Response.ContentLength = file.Size;
+            var encoded = Uri.EscapeDataString(file.FileName);
+            context.Response.Headers.ContentDisposition = $"attachment; filename=\"{file.FileName.Replace("\"", "%22")}\"; filename*=UTF-8''{encoded}";
+            await using var source = await item.OpenReadAsync(context.RequestAborted).ConfigureAwait(false);
+            await source.CopyToAsync(context.Response.Body, context.RequestAborted).ConfigureAwait(false);
+        }
+        catch (WebSharePinException)
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        }
+        catch (WebSharePinRateLimitedException)
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        }
     }
 
     private Task InfoAsync(HttpContext context)

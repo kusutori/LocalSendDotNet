@@ -16,6 +16,8 @@ Use `GetDevices()` for an initial snapshot and `WatchDeviceChangesAsync()` for a
 
 Discovery listens for operating-system address changes and rebinds its IPv4 multicast receiver after a short debounce. Periodic maintenance retries interfaces that could not join. `RefreshAsync` retries multicast, announces when it is available, and always scans local `/24` subnets over HTTP using `DiscoveryTimeout`. `NetworkWhitelist` and `NetworkBlacklist` on `LocalSendOptions` filter those discovery addresses with dotted-quad patterns (`*` matches one octet). The HTTP server still listens on every interface. Restart the node after changing the lists.
 
+`StartWebShareAsync` serves a browser download page at the node root (`/`). Browsers call `POST /api/localsend/v2/prepare-download` (optional `pin` query) and then `GET /api/localsend/v2/download`. Pending browser sessions appear in `WatchWebShareAsync` until `AcceptWebShareRequest` or `DeclineWebShareRequest`. `WebShareOptions.AutoAccept` skips that confirmation.
+
 For a manually entered address, call `ProbeDeviceAsync(endpoint)` first. HTTPS probes validate that the certificate is current, self-signed consistently, and agrees with the fingerprint returned by `/info`; the returned fingerprint is still trust-on-first-use and should be shown for user confirmation. After confirmation, call `AddKnownDeviceAsync(endpoint, fingerprint)`. Manually trusted devices remain in the in-memory list until `RemoveDevice` or node disposal instead of expiring with multicast peers. HTTP probes cannot cryptographically verify identity and return `IdentityVerified == false`.
 
 ## Sending

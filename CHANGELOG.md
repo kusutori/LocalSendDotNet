@@ -3,6 +3,7 @@
 ## 0.2.0-preview.5
 
 - Add `NetworkWhitelist` and `NetworkBlacklist` on `LocalSendOptions` so discovery, announcements, and HTTP subnet scans can follow LocalSend-style IPv4 interface patterns.
+- Add browser link sharing: `StartWebShareAsync` serves a download page at `/`, with PIN, auto-accept, and accept/decline for each browser session.
 
 ## 0.2.0-preview.4
 

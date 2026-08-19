@@ -31,6 +31,8 @@ public sealed class LocalSendNode : IAsyncDisposable
     private DeviceIdentity? _identity;
     private V2HttpClient? _client;
     private V2Server? _server;
+    private WebShareService? _webShare;
+    private readonly BroadcastHub<WebShareState> _webShareChanges = new(32);
     private V2MulticastDiscovery? _discovery;
     private Task? _maintenance;
     private LocalSendNodeState _state = LocalSendNodeState.Created;
@@ -82,7 +84,9 @@ public sealed class LocalSendNode : IAsyncDisposable
                 Directory.CreateDirectory(_options.DownloadDirectory);
                 _identity = await DeviceIdentityStore.LoadOrCreateAsync(_options.DataDirectory, cancellationToken).ConfigureAwait(false);
                 _client = new V2HttpClient(_identity, _options);
-                _server = new V2Server(_options, _identity, () => CreateLocalInfo(), OnRegisterAsync, OnPrepareAsync, OnUploadAsync, OnCancelAsync, _logger);
+                _webShare = new WebShareService(_options, _logger);
+                _webShare.Changed += PublishWebShare;
+                _server = new V2Server(_options, _identity, () => CreateLocalInfo(), OnRegisterAsync, OnPrepareAsync, OnUploadAsync, OnCancelAsync, _logger, _webShare);
                 await _server.StartAsync(cancellationToken).ConfigureAwait(false);
                 await StartDiscoveryAsync(cancellationToken).ConfigureAwait(false);
                 _started = true;
@@ -104,6 +108,12 @@ public sealed class LocalSendNode : IAsyncDisposable
                     catch (Exception cleanupException) { _logger.LogDebug(cleanupException, "Could not clean up server after startup failure"); }
                 }
                 _discovery = null;
+                if (_webShare is not null)
+                {
+                    _webShare.Changed -= PublishWebShare;
+                    _webShare.Stop();
+                }
+                _webShare = null;
                 _server = null;
                 _client = null;
                 _identity?.Dispose();
@@ -148,13 +158,20 @@ public sealed class LocalSendNode : IAsyncDisposable
                 await _discovery.DisposeAsync().ConfigureAwait(false);
             if (_server is not null)
                 await _server.DisposeAsync().ConfigureAwait(false);
+            if (_webShare is not null)
+            {
+                _webShare.Changed -= PublishWebShare;
+                _webShare.Stop();
+            }
             _discovery = null;
+            _webShare = null;
             _server = null;
             _started = false;
             _stopped = true;
             SetState(LocalSendNodeState.Stopped);
             _deviceChanges.Complete();
             _incomingTransfers.Complete();
+            _webShareChanges.Complete();
         }
         finally { _lifecycle.Release(); }
     }
@@ -197,6 +214,48 @@ public sealed class LocalSendNode : IAsyncDisposable
     /// <summary>Watches incoming offers that require an accept or decline decision.</summary>
     /// <param name="cancellationToken">Stops enumeration.</param>
     public IAsyncEnumerable<IncomingTransferRequest> WatchIncomingTransfersAsync(CancellationToken cancellationToken = default) => _incomingTransfers.Subscribe(cancellationToken);
+
+    /// <summary>Gets a snapshot of the current browser share session, or an inactive state.</summary>
+    public WebShareState GetWebShare() => _webShare?.Snapshot() ?? WebShareState.Inactive;
+
+    /// <summary>Watches browser share session changes occurring after subscription.</summary>
+    /// <param name="cancellationToken">Stops enumeration.</param>
+    public IAsyncEnumerable<WebShareState> WatchWebShareAsync(CancellationToken cancellationToken = default) => _webShareChanges.Subscribe(cancellationToken);
+
+    /// <summary>Serves the given items to browsers at this node's HTTP root.</summary>
+    /// <param name="items">Files and text offered for download.</param>
+    /// <param name="options">PIN and auto-accept behavior.</param>
+    /// <param name="cancellationToken">Cancels the start wait.</param>
+    public Task StartWebShareAsync(IReadOnlyList<SendItem> items, WebShareOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        EnsureStarted();
+        cancellationToken.ThrowIfCancellationRequested();
+        _webShare!.Start(items, options);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Stops serving browser downloads.</summary>
+    public void StopWebShare() => _webShare?.Stop();
+
+    /// <summary>Sets whether new browser requests are accepted without confirmation.</summary>
+    public void SetWebShareAutoAccept(bool autoAccept) => _webShare?.SetAutoAccept(autoAccept);
+
+    /// <summary>Sets or clears the PIN browsers must enter.</summary>
+    public void SetWebSharePin(string? pin) => _webShare?.SetPin(pin);
+
+    /// <summary>Accepts a pending browser download request.</summary>
+    public bool AcceptWebShareRequest(string sessionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        return _webShare?.Accept(sessionId) == true;
+    }
+
+    /// <summary>Declines a pending browser download request.</summary>
+    public bool DeclineWebShareRequest(string sessionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        return _webShare?.Decline(sessionId) == true;
+    }
 
     /// <summary>Registers with and retains a manually trusted peer until explicit removal or disposal.</summary>
     /// <param name="endpoint">The peer endpoint.</param>
@@ -805,6 +864,8 @@ public sealed class LocalSendNode : IAsyncDisposable
         if (ParseTimestamp(metadata.Modified) is { } modified) File.SetLastWriteTimeUtc(path, modified.UtcDateTime);
         if (ParseTimestamp(metadata.Accessed) is { } accessed) File.SetLastAccessTimeUtc(path, accessed.UtcDateTime);
     }
+
+    private void PublishWebShare() => _webShareChanges.Publish(GetWebShare());
 
     private void EnsureStarted()
     {

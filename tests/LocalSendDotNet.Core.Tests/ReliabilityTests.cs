@@ -112,7 +112,8 @@ public sealed class ReliabilityTests
         foreach (var method in new[]
         {
             "StartAsync", "StopAsync", "RefreshAsync", "GetDevices", "WatchDeviceChangesAsync", "WatchIncomingTransfersAsync",
-            "SendAsync", "AcceptAsync", "DeclineAsync", "CancelTransferAsync", "ProbeDeviceAsync", "AddKnownDeviceAsync", "RemoveDevice"
+            "SendAsync", "AcceptAsync", "DeclineAsync", "CancelTransferAsync", "ProbeDeviceAsync", "AddKnownDeviceAsync", "RemoveDevice",
+            "StartWebShareAsync", "StopWebShare", "WatchWebShareAsync"
         })
             Assert.Contains(method, methods);
     }

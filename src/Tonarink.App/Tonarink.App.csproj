@@ -94,6 +94,7 @@
         <PackageReference Include="Microsoft.WindowsAppSDK" />
         <PackageReference Include="Microsoft.UI.Reactor" />
         <PackageReference Include="WinUIEx" />
+        <PackageReference Include="Net.Codecrete.QrCodeGenerator" />
         <ProjectReference Include="..\LocalSendDotNet.Core\LocalSendDotNet.Core.csproj" />
     </ItemGroup>
 

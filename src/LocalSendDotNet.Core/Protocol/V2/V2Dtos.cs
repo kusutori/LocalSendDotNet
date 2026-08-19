@@ -64,3 +64,16 @@ internal sealed class ErrorResponseDto
 {
     public required string Message { get; init; }
 }
+
+internal sealed class PrepareDownloadResponseDto
+{
+    public required string SessionId { get; init; }
+    public required PrepareDownloadFileDto[] Files { get; init; }
+}
+
+internal sealed class PrepareDownloadFileDto
+{
+    public required string Id { get; init; }
+    public required string FileName { get; init; }
+    public long Size { get; init; }
+}

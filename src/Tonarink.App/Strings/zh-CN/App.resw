@@ -29,6 +29,7 @@
   <data name="ClipboardReadFailed" xml:space="preserve"><value>无法读取剪贴板：{error}</value></data>
   <data name="ClipboardText" xml:space="preserve"><value>剪贴板文本</value></data>
   <data name="Close" xml:space="preserve"><value>关闭</value></data>
+  <data name="Confirm" xml:space="preserve"><value>确定</value></data>
   <data name="ContentManyItems" xml:space="preserve"><value>{count} 个项目</value></data>
   <data name="ContentOneFile" xml:space="preserve"><value>文件 {file}</value></data>
   <data name="ContentOneTextMessage" xml:space="preserve"><value>一条文本消息</value></data>
@@ -243,6 +244,22 @@
   <data name="TransferTransferring" xml:space="preserve"><value>正在传输</value></data>
   <data name="TransferWaiting" xml:space="preserve"><value>等待接受</value></data>
   <data name="WaitingForDevice" xml:space="preserve"><value>正在等待 {device} 接受…</value></data>
+  <data name="WebShareAccepted" xml:space="preserve"><value>已接受</value></data>
+  <data name="WebShareAutoAccept" xml:space="preserve"><value>自动接受请求</value></data>
+  <data name="WebShareCopy" xml:space="preserve"><value>复制链接</value></data>
+  <data name="WebShareEncryption" xml:space="preserve"><value>加密</value></data>
+  <data name="WebShareEncryptionHint" xml:space="preserve"><value>HTTPS 使用此设备的证书。浏览器会提示该证书不受信任。</value></data>
+  <data name="WebShareNoRequests" xml:space="preserve"><value>尚无请求。</value></data>
+  <data name="WebShareOpenLink" xml:space="preserve"><value>在浏览器中打开链接：</value></data>
+  <data name="WebSharePinHint" xml:space="preserve"><value>PIN 为 “{pin}”</value></data>
+  <data name="WebSharePinTitle" xml:space="preserve"><value>PIN</value></data>
+  <data name="WebShareQr" xml:space="preserve"><value>二维码</value></data>
+  <data name="WebShareQrTitle" xml:space="preserve"><value>二维码</value></data>
+  <data name="WebShareRequests" xml:space="preserve"><value>请求</value></data>
+  <data name="WebShareRequirePin" xml:space="preserve"><value>需要一个 PIN</value></data>
+  <data name="WebShareTitle" xml:space="preserve"><value>分享为链接</value></data>
+  <data name="WebShareZoom" xml:space="preserve"><value>放大显示链接</value></data>
+  <data name="WebShareZoomTitle" xml:space="preserve"><value>链接</value></data>
   <data name="WantsToSendMessage" xml:space="preserve"><value>想要发送给你一条消息：</value></data>
   <data name="WindowUnavailable" xml:space="preserve"><value>当前 Reactor 窗口不可用。</value></data>
 </root>

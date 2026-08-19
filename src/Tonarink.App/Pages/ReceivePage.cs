@@ -1,6 +1,3 @@
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using CommunityToolkit.WinUI.Controls;
 using LocalSendDotNet;
 using Microsoft.UI.Reactor;
@@ -157,7 +154,7 @@ sealed class ReceivePage : Component<ReceivePageProps>
         AppSettings settings,
         LocalSendIdentity? identity)
     {
-        var addresses = LocalIpv4Addresses(settings);
+        var addresses = AppNetworkAddresses.ListIpv4(settings);
         var ipText = addresses.Count == 0
             ? t.Message(new("App", "DeviceInfoNoAddress"))
             : string.Join(Environment.NewLine, addresses);
@@ -191,35 +188,6 @@ sealed class ReceivePage : Component<ReceivePageProps>
             .TextWrapping(TextWrapping.WrapWholeWords)
             .HAlign(HorizontalAlignment.Right)
             .VAlign(VerticalAlignment.Center);
-
-    private static IReadOnlyList<string> LocalIpv4Addresses(AppSettings settings)
-    {
-        var addresses = new List<string>();
-        foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
-        {
-            if (nic.OperationalStatus != OperationalStatus.Up
-                || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-                continue;
-
-            var interfaceAddresses = nic.GetIPProperties().UnicastAddresses
-                .Select(static item => item.Address)
-                .Where(static address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
-                .Select(static address => address.ToString())
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-            if (interfaceAddresses.Length == 0)
-                continue;
-            if (NetworkAddressPatterns.IsInterfaceIgnored(
-                interfaceAddresses,
-                settings.NetworkWhitelist,
-                settings.NetworkBlacklist))
-                continue;
-
-            addresses.AddRange(interfaceAddresses);
-        }
-
-        return addresses.Distinct(StringComparer.Ordinal).ToArray();
-    }
 
     private static void PlayIdleLogoAnimation(AnimatedVisualPlayer? player)
     {

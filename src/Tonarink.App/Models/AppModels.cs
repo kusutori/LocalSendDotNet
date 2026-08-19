@@ -9,6 +9,7 @@ enum AppRoute
     Send,
     Settings,
     NetworkInterfaces,
+    WebShare,
 }
 
 enum AutoSaveMode

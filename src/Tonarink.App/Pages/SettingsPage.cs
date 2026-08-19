@@ -26,12 +26,6 @@ sealed class SettingsPage : Component<SettingsPageProps>
         var t = UseIntl();
         var window = UseWindow();
         var navigation = UseNavigation<AppRoute>();
-        var autoSaveItems = UseMemo(() => new string[]
-        {
-            t.Message(new("App", "AutoSaveOff")),
-            t.Message(new("App", "AutoSaveFavorites")),
-            t.Message(new("App", "AutoSaveOn")),
-        }, t.Locale);
         var (statusMessage, setStatusMessage) = UseState<string?>(null);
         var (encryptionNoticeOpen, setEncryptionNoticeOpen) = UseState(false);
         var nodeState = Props.Runtime.NodeState;
@@ -124,22 +118,6 @@ sealed class SettingsPage : Component<SettingsPageProps>
 
         var receiveCards = SettingsGroup(
             t.Message(new("App", "SettingsReceive")),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsAutoSave")),
-                description: t.Message(new("App", "SettingsAutoSaveDescription")),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                ComboBox(
-                    autoSaveItems,
-                    selectedIndex: (int)Props.Settings.AutoSave,
-                    onSelectedIndexChanged: index =>
-                    Props.UpdateSettings(settings => settings with
-                    {
-                        AutoSave = (AutoSaveMode)index,
-                        FavoritesOnly = (AutoSaveMode)index == AutoSaveMode.Favorites,
-                    }))
-                    .MinWidth(160)),
             SettingsCard(
                 header: t.Message(new("App", "SettingsSaveLocation")),
                 description: Props.Settings.DownloadDirectory,

@@ -90,6 +90,13 @@
   <data name="NavReceive" xml:space="preserve"><value>Receive</value></data>
   <data name="NavSend" xml:space="preserve"><value>Send</value></data>
   <data name="NavSettings" xml:space="preserve"><value>Settings</value></data>
+  <data name="NotificationIncomingTitle" xml:space="preserve"><value>Incoming transfer from {device}</value></data>
+  <data name="NotificationReceiveCompleteTitle" xml:space="preserve"><value>Receive complete</value></data>
+  <data name="NotificationReceiveCompleteOne" xml:space="preserve"><value>Received an item from {device}.</value></data>
+  <data name="NotificationReceiveCompleteMany" xml:space="preserve"><value>Received {count} items from {device}.</value></data>
+  <data name="NotificationSendCompleteTitle" xml:space="preserve"><value>Send complete</value></data>
+  <data name="NotificationSendCompleteOne" xml:space="preserve"><value>Sent an item to {device}.</value></data>
+  <data name="NotificationSendCompleteMany" xml:space="preserve"><value>Sent {count} items to {device}.</value></data>
   <data name="NearbyDevices" xml:space="preserve"><value>Nearby devices</value></data>
   <data name="NetworkStartFailed" xml:space="preserve"><value>Could not start the network service</value></data>
   <data name="DiscoveryScanHint" xml:space="preserve"><value>Multicast discovery is unavailable. Nearby devices are found by scanning this network.</value></data>

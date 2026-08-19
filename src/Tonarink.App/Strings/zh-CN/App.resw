@@ -90,6 +90,13 @@
   <data name="NavReceive" xml:space="preserve"><value>接收</value></data>
   <data name="NavSend" xml:space="preserve"><value>发送</value></data>
   <data name="NavSettings" xml:space="preserve"><value>设置</value></data>
+  <data name="NotificationIncomingTitle" xml:space="preserve"><value>来自 {device} 的传输请求</value></data>
+  <data name="NotificationReceiveCompleteTitle" xml:space="preserve"><value>接收完成</value></data>
+  <data name="NotificationReceiveCompleteOne" xml:space="preserve"><value>已接收来自 {device} 的 1 个项目。</value></data>
+  <data name="NotificationReceiveCompleteMany" xml:space="preserve"><value>已接收来自 {device} 的 {count} 个项目。</value></data>
+  <data name="NotificationSendCompleteTitle" xml:space="preserve"><value>发送完成</value></data>
+  <data name="NotificationSendCompleteOne" xml:space="preserve"><value>已向 {device} 发送 1 个项目。</value></data>
+  <data name="NotificationSendCompleteMany" xml:space="preserve"><value>已向 {device} 发送 {count} 个项目。</value></data>
   <data name="NearbyDevices" xml:space="preserve"><value>附近的设备</value></data>
   <data name="NetworkStartFailed" xml:space="preserve"><value>无法启动网络服务</value></data>
   <data name="DiscoveryScanHint" xml:space="preserve"><value>多播发现不可用。正在通过扫描局域网查找附近设备。</value></data>

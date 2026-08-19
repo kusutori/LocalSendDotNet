@@ -708,6 +708,17 @@ sealed class SendPage : Component<SendPageProps>
                     isPending: false);
                 if (result.IsSuccess)
                 {
+                    AppNotificationService.Show(
+                        t.Message(new("App", "NotificationSendCompleteTitle")),
+                        selectedItems.Count == 1
+                            ? t.Message(
+                                new("App", "NotificationSendCompleteOne"),
+                                ("device", device.Alias))
+                            : t.Message(
+                                new("App", "NotificationSendCompleteMany"),
+                                ("count", selectedItems.Count),
+                                ("device", device.Alias)),
+                        "send-complete");
                     updateSelectedItems(_ => Array.Empty<SelectedSendItem>());
                     setPickerMessage(t.Message(new("App", "NothingSelected")));
                 }

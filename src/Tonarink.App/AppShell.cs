@@ -131,9 +131,15 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         UseEffect(() =>
         {
             EventHandler activationReceived = (_, _) => ScheduleActivationDrain();
+            EventHandler notificationActivated = (_, _) => ScheduleActivationDrain();
             ShareTargetActivationBroker.ActivationReceived += activationReceived;
+            AppNotificationService.Activated += notificationActivated;
             ScheduleActivationDrain();
-            return () => ShareTargetActivationBroker.ActivationReceived -= activationReceived;
+            return () =>
+            {
+                ShareTargetActivationBroker.ActivationReceived -= activationReceived;
+                AppNotificationService.Activated -= notificationActivated;
+            };
         });
 
         UseEffect(() =>
@@ -593,6 +599,12 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         {
             await foreach (var request in node.WatchIncomingTransfersAsync(cancellationToken).ConfigureAwait(false))
             {
+                AppNotificationService.Show(
+                    t.Message(
+                        new("App", "NotificationIncomingTitle"),
+                        ("device", request.Sender.Alias)),
+                    TransferOverlayVisuals.IncomingSummary(t, request.Items),
+                    "incoming-request");
                 updateRuntime(current => current with
                 {
                     IncomingTransfers = [.. current.IncomingTransfers, request],

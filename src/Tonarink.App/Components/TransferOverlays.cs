@@ -351,7 +351,20 @@ sealed class IncomingTransferOverlay : Component<IncomingTransferOverlayProps>
             {
                 var result = await acceptMutation.RunAsync(true);
                 if (result.IsSuccess)
+                {
                     ReceiveHistoryStore.Record(request.Sender.Alias, result);
+                    AppNotificationService.Show(
+                        t.Message(new("App", "NotificationReceiveCompleteTitle")),
+                        request.Items.Count == 1
+                            ? t.Message(
+                                new("App", "NotificationReceiveCompleteOne"),
+                                ("device", request.Sender.Alias))
+                            : t.Message(
+                                new("App", "NotificationReceiveCompleteMany"),
+                                ("count", request.Items.Count),
+                                ("device", request.Sender.Alias)),
+                        "receive-complete");
+                }
                 var receivedText = showText && result.IsSuccess
                     ? await ReadReceivedTextAsync(result)
                     : view.Text;

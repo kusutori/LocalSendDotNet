@@ -26,6 +26,12 @@ sealed class SettingsPage : Component<SettingsPageProps>
         var t = UseIntl();
         var window = UseWindow();
         var navigation = UseNavigation<AppRoute>();
+        var autoSaveItems = UseMemo(() => new string[]
+        {
+            t.Message(new("App", "AutoSaveOff")),
+            t.Message(new("App", "AutoSaveFavorites")),
+            t.Message(new("App", "AutoSaveOn")),
+        }, t.Locale);
         var (statusMessage, setStatusMessage) = UseState<string?>(null);
         var (encryptionNoticeOpen, setEncryptionNoticeOpen) = UseState(false);
         var nodeState = Props.Runtime.NodeState;
@@ -124,19 +130,16 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 isClickEnabled: false,
                 isActionIconVisible: false,
                 content:
-                ToggleSwitch(Props.Settings.AutoSave == AutoSaveMode.On, value =>
+                ComboBox(
+                    autoSaveItems,
+                    selectedIndex: (int)Props.Settings.AutoSave,
+                    onSelectedIndexChanged: index =>
                     Props.UpdateSettings(settings => settings with
                     {
-                        AutoSave = value ? AutoSaveMode.On : AutoSaveMode.Off,
-                    }))),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsFavoritesOnly")),
-                description: t.Message(new("App", "SettingsFavoritesOnlyDescription")),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                ToggleSwitch(Props.Settings.FavoritesOnly, value =>
-                    Props.UpdateSettings(settings => settings with { FavoritesOnly = value }))),
+                        AutoSave = (AutoSaveMode)index,
+                        FavoritesOnly = (AutoSaveMode)index == AutoSaveMode.Favorites,
+                    }))
+                    .MinWidth(160)),
             SettingsCard(
                 header: t.Message(new("App", "SettingsSaveLocation")),
                 description: Props.Settings.DownloadDirectory,

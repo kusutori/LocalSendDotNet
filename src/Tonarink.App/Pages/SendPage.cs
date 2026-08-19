@@ -37,12 +37,6 @@ sealed record SendRequest(
     string? Pin,
     CancellationToken CancellationToken);
 
-sealed record FavoriteDevice(
-    string Fingerprint,
-    string Name,
-    string Address,
-    int Port);
-
 sealed record TransferUiState(
     TransferState? State,
     string? DeviceName,
@@ -62,9 +56,6 @@ sealed record TransferUiState(
 
 sealed class SendPage : Component<SendPageProps>
 {
-    private static readonly IReadOnlyDictionary<string, FavoriteDevice> EmptyFavorites =
-        new Dictionary<string, FavoriteDevice>(StringComparer.Ordinal);
-
     public override Element Render()
     {
         var t = UseIntl();
@@ -77,7 +68,13 @@ sealed class SendPage : Component<SendPageProps>
         var (pinTarget, setPinTarget) = UseState<LocalSendDevice?>(null);
         var (pin, setPin) = UseState(string.Empty);
         var (pinError, setPinError) = UseState<string?>(null);
-        var (favorites, updateFavorites) = UseReducer(EmptyFavorites);
+        var favorites = UseExternalStore<IReadOnlyDictionary<string, FavoriteDevice>>(
+            listener =>
+            {
+                FavoriteDeviceStore.Changed += listener;
+                return () => FavoriteDeviceStore.Changed -= listener;
+            },
+            static () => FavoriteDeviceStore.Entries);
         var (favoriteTarget, setFavoriteTarget) = UseState<LocalSendDevice?>(null);
         var (favoriteName, setFavoriteName) = UseState(string.Empty);
         var (favoriteAddress, setFavoriteAddress) = UseState(string.Empty);
@@ -431,15 +428,7 @@ sealed class SendPage : Component<SendPageProps>
                             favoriteName.Trim(),
                             IPAddress.Parse(favoriteAddress).ToString(),
                             parsedPort);
-                        updateFavorites(current =>
-                        {
-                            var updated = current.ToDictionary(
-                                static pair => pair.Key,
-                                static pair => pair.Value,
-                                StringComparer.Ordinal);
-                            updated[target.Fingerprint] = savedFavorite;
-                            return updated;
-                        });
+                        FavoriteDeviceStore.Upsert(savedFavorite);
                     }
                     setFavoriteTarget(null);
                 },

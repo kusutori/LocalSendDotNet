@@ -5,6 +5,7 @@ using Microsoft.UI.Reactor.Layout;
 using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Controls;
 using static Microsoft.UI.Reactor.Factories;
 using static Tonarink.Controls.Toolkit.SegmentedElement;
 using static TransferOverlayVisuals;
@@ -29,14 +30,13 @@ sealed class ReceivePage : Component<ReceivePageProps>
         var identity = Props.Runtime.Identity;
         var stored = AppSettingsStore.Load();
         var (alias, setAlias) = UseState(stored.ResolvedAlias);
-        var (deviceType, setDeviceType) = UseState(stored.DeviceType);
+        var idleLogoPlayerRef = UseRef<AnimatedVisualPlayer?>(null);
         UseNavigationLifecycle(onNavigatedTo: _ =>
         {
             var current = AppSettingsStore.Load();
             setAlias(current.ResolvedAlias);
-            setDeviceType(current.DeviceType);
+            PlayIdleLogoAnimation(idleLogoPlayerRef.Current);
         });
-        var displayedType = deviceType;
         var fingerprint = identity?.Fingerprint;
         var fingerprintPreview = fingerprint is null ? null : fingerprint[..12];
         var shortId = fingerprint is null
@@ -44,11 +44,26 @@ sealed class ReceivePage : Component<ReceivePageProps>
             : $"#{Convert.ToInt32(fingerprint[..4], 16) % 1000:D3}  #1";
 
         var identityPanel = FlexColumn(
-            Border(Icon(FontIcon(DeviceTypeGlyph(displayedType), fontSize: 48)).AccessibilityHidden())
-                .Size(112, 112)
-                .CornerRadius(56)
-                .Background(Theme.SubtleFill)
-                .HAlign(HorizontalAlignment.Center),
+            (AnimatedVisualPlayer() with { AutoPlay = false })
+                .Size(144, 144)
+                .HAlign(HorizontalAlignment.Center)
+                .AccessibilityHidden()
+                .OnMountAdd(element =>
+                {
+                    if (element is not AnimatedVisualPlayer player)
+                        return;
+
+                    idleLogoPlayerRef.Current = player;
+                    PlayIdleLogoAnimation(player);
+                })
+                .OnUnmountAdd(element =>
+                {
+                    if (element is AnimatedVisualPlayer player
+                        && ReferenceEquals(idleLogoPlayerRef.Current, player))
+                    {
+                        idleLogoPlayerRef.Current = null;
+                    }
+                }),
             Title(alias).HAlign(HorizontalAlignment.Center),
             BodyLarge(shortId)
                 .Foreground(Theme.SecondaryText)
@@ -88,6 +103,7 @@ sealed class ReceivePage : Component<ReceivePageProps>
                     onSelectedIndexChanged: index => Props.UpdateSettings(settings => settings with
                     {
                         AutoSave = (AutoSaveMode)index,
+                        FavoritesOnly = (AutoSaveMode)index == AutoSaveMode.Favorites,
                     }),
                     items: autoSaveItems)
                     .HAlign(HorizontalAlignment.Stretch)) with
@@ -119,5 +135,14 @@ sealed class ReceivePage : Component<ReceivePageProps>
             .Landmark(AutomationLandmarkType.Main);
 
         return page;
+    }
+
+    private static void PlayIdleLogoAnimation(AnimatedVisualPlayer? player)
+    {
+        if (player is null)
+            return;
+
+        player.Source = new Tonarink.IdleLogo();
+        _ = player.PlayAsync(fromProgress: 0, toProgress: 1, looped: true);
     }
 }

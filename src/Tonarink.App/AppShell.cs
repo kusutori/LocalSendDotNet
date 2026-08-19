@@ -605,10 +605,80 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                         ("device", request.Sender.Alias)),
                     TransferOverlayVisuals.IncomingSummary(t, request.Items),
                     "incoming-request");
+
+                var currentSettings = AppSettingsStore.Load();
+                var autoAccept = currentSettings.AutoSave switch
+                {
+                    AutoSaveMode.On => true,
+                    AutoSaveMode.Favorites => FavoriteDeviceStore.Contains(request.Sender.Fingerprint),
+                    _ => false,
+                };
+                if (autoAccept)
+                {
+                    _ = AutoAcceptIncomingAsync(
+                        node,
+                        request,
+                        currentSettings.DownloadDirectory,
+                        cancellationToken);
+                    continue;
+                }
+
                 updateRuntime(current => current with
                 {
                     IncomingTransfers = [.. current.IncomingTransfers, request],
                 });
+            }
+        }
+
+        async Task AutoAcceptIncomingAsync(
+            LocalSendNode node,
+            IncomingTransferRequest request,
+            string downloadDirectory,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var result = await node.AcceptAsync(
+                    request.RequestId,
+                    new AcceptTransferOptions
+                    {
+                        DestinationDirectory = downloadDirectory,
+                    },
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                if (!result.IsSuccess)
+                {
+                    var message = result.Failure?.Message ?? t.Message(new("App", "ReceiveFailed"));
+                    AppNotificationService.Show(
+                        t.Message(new("App", "ReceiveFailed")),
+                        message,
+                        "receive-failed");
+                    updateRuntime(current => current with { Error = message });
+                    return;
+                }
+
+                ReceiveHistoryStore.Record(request.Sender.Alias, result);
+                AppNotificationService.Show(
+                    t.Message(new("App", "NotificationReceiveCompleteTitle")),
+                    request.Items.Count == 1
+                        ? t.Message(
+                            new("App", "NotificationReceiveCompleteOne"),
+                            ("device", request.Sender.Alias))
+                        : t.Message(
+                            new("App", "NotificationReceiveCompleteMany"),
+                            ("count", request.Items.Count),
+                            ("device", request.Sender.Alias)),
+                    "receive-complete");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                AppNotificationService.Show(
+                    t.Message(new("App", "ReceiveFailed")),
+                    exception.Message,
+                    "receive-failed");
+                updateRuntime(current => current with { Error = exception.Message });
             }
         }
 

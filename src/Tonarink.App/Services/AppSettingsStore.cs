@@ -7,7 +7,7 @@ using LocalSendDotNet;
 static class AppSettingsStore
 {
     private static readonly string FilePath = Path.Combine(AppPlatform.DataDirectory, "settings.json");
-    private static AppSettings? _cached;
+    private static volatile AppSettings? _cached;
 
     public static event Action? Changed;
 
@@ -83,18 +83,22 @@ sealed class AppSettingsFile
     public AppSettings ToSettings()
     {
         var defaults = AppSettings.Default;
+        var autoSave = Enum.TryParse<AutoSaveMode>(AutoSave, ignoreCase: true, out var parsedAutoSave)
+            ? parsedAutoSave
+            : defaults.AutoSave;
+        if (autoSave == AutoSaveMode.On && FavoritesOnly == true)
+            autoSave = AutoSaveMode.Favorites;
+
         return defaults with
         {
             Alias = string.IsNullOrWhiteSpace(Alias) ? defaults.Alias : Alias.Trim(),
-            AutoSave = Enum.TryParse<AutoSaveMode>(AutoSave, ignoreCase: true, out var autoSave)
-                ? autoSave
-                : defaults.AutoSave,
+            AutoSave = autoSave,
             ThemeIndex = ThemeIndex is >= 0 and <= 2 ? ThemeIndex.Value : defaults.ThemeIndex,
             LanguageIndex = LanguageIndex is >= 0 and <= 2 ? LanguageIndex.Value : defaults.LanguageIndex,
             MinimizeToTray = MinimizeToTray ?? defaults.MinimizeToTray,
             StartWithWindows = StartWithWindows ?? defaults.StartWithWindows,
             AnimationsEnabled = AnimationsEnabled ?? defaults.AnimationsEnabled,
-            FavoritesOnly = FavoritesOnly ?? defaults.FavoritesOnly,
+            FavoritesOnly = autoSave == AutoSaveMode.Favorites,
             DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirectory)
                 ? defaults.DownloadDirectory
                 : DownloadDirectory,

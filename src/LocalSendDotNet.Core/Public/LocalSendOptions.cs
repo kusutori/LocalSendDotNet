@@ -24,6 +24,24 @@ public sealed class LocalSendOptions
     public int Port { get; init; } = DefaultPort;
     /// <summary>Gets the IPv4 multicast group used by protocol v2 discovery.</summary>
     public IPAddress MulticastAddress { get; init; } = DefaultMulticastAddress;
+    /// <summary>
+    /// Gets optional IPv4 patterns that limit discovery to matching local interfaces.
+    /// </summary>
+    /// <remarks>
+    /// When this list is not <see langword="null"/>, multicast, announcements, and HTTP subnet scans
+    /// use only interfaces that have at least one matching address. A <c>*</c> octet is allowed.
+    /// Takes precedence over <see cref="NetworkBlacklist"/>. Restart the node after changing this list.
+    /// </remarks>
+    public IReadOnlyList<string>? NetworkWhitelist { get; init; }
+    /// <summary>
+    /// Gets optional IPv4 patterns that exclude matching local interfaces from discovery.
+    /// </summary>
+    /// <remarks>
+    /// When this list is not <see langword="null"/> and <see cref="NetworkWhitelist"/> is
+    /// <see langword="null"/>, interfaces with any matching address are skipped. A <c>*</c> octet is allowed.
+    /// Restart the node after changing this list.
+    /// </remarks>
+    public IReadOnlyList<string>? NetworkBlacklist { get; init; }
     /// <summary>Gets whether HTTPS and LocalSend mutual certificate identity are enabled.</summary>
     public bool EnableHttps { get; init; } = true;
     /// <summary>Gets the optional PIN required from incoming senders.</summary>

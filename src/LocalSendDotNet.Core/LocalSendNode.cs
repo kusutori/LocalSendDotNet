@@ -440,7 +440,7 @@ public sealed class LocalSendNode : IAsyncDisposable
     private async Task ScanSubnetsAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<IPAddress> localAddresses;
-        try { localAddresses = LocalNetworkAddresses.GetUnicastIPv4(); }
+        try { localAddresses = LocalNetworkAddresses.GetUnicastIPv4(_options.NetworkWhitelist, _options.NetworkBlacklist); }
         catch (Exception exception)
         {
             _logger.LogDebug(exception, "Could not list interfaces for HTTP discovery");

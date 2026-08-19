@@ -59,6 +59,8 @@ sealed class AppSettingsFile
     public int? DiscoveryTimeoutMs { get; set; }
     public bool? EnableHttps { get; set; }
     public string? MulticastGroup { get; set; }
+    public string[]? NetworkWhitelist { get; set; }
+    public string[]? NetworkBlacklist { get; set; }
 
     public static AppSettingsFile FromSettings(AppSettings settings) => new()
     {
@@ -76,6 +78,8 @@ sealed class AppSettingsFile
         DiscoveryTimeoutMs = settings.DiscoveryTimeoutMs,
         EnableHttps = settings.EnableHttps,
         MulticastGroup = settings.MulticastGroup,
+        NetworkWhitelist = Copy(settings.NetworkWhitelist),
+        NetworkBlacklist = Copy(settings.NetworkBlacklist),
     };
 
     public AppSettings ToSettings()
@@ -107,8 +111,13 @@ sealed class AppSettingsFile
             DiscoveryTimeoutMs = DiscoveryTimeoutMs is > 0 ? DiscoveryTimeoutMs.Value : defaults.DiscoveryTimeoutMs,
             EnableHttps = EnableHttps ?? defaults.EnableHttps,
             MulticastGroup = IsMulticastGroup(MulticastGroup) ? MulticastGroup! : defaults.MulticastGroup,
+            NetworkWhitelist = Copy(NetworkWhitelist),
+            NetworkBlacklist = NetworkWhitelist is null ? Copy(NetworkBlacklist) : null,
         };
     }
+
+    private static string[]? Copy(IReadOnlyList<string>? values) =>
+        values is null ? null : [.. values];
 
     private static bool IsMulticastGroup(string? value) =>
         !string.IsNullOrWhiteSpace(value)
@@ -118,4 +127,5 @@ sealed class AppSettingsFile
 
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNameCaseInsensitive = true)]
 [JsonSerializable(typeof(AppSettingsFile))]
+[JsonSerializable(typeof(string[]))]
 internal sealed partial class AppSettingsJsonContext : JsonSerializerContext;

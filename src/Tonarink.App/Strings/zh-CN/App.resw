@@ -183,7 +183,14 @@
   <data name="SettingsNetwork" xml:space="preserve"><value>名称与网络</value></data>
   <data name="SettingsNetworkInterfaces" xml:space="preserve"><value>网络接口</value></data>
   <data name="SettingsNetworkInterfacesAll" xml:space="preserve"><value>全部</value></data>
-  <data name="SettingsNetworkInterfacesPlaceholder" xml:space="preserve"><value>网卡筛选尚未实现。此页是占位界面，以后可以在这里选择 Tonarink 使用的网络接口。</value></data>
+  <data name="SettingsNetworkInterfacesBlacklist" xml:space="preserve"><value>黑名单</value></data>
+  <data name="SettingsNetworkInterfacesEmpty" xml:space="preserve"><value>没有找到 IPv4 网络接口。</value></data>
+  <data name="SettingsNetworkInterfacesExample" xml:space="preserve"><value>示例:</value></data>
+  <data name="SettingsNetworkInterfacesInfo" xml:space="preserve"><value>默认情况下，Tonarink 使用所有可用的网络接口。您可以在此处排除不需要的网络。您需要重新启动服务器以应用更改。</value></data>
+  <data name="SettingsNetworkInterfacesPattern" xml:space="preserve"><value>规则 {index}</value></data>
+  <data name="SettingsNetworkInterfacesPreview" xml:space="preserve"><value>预览</value></data>
+  <data name="SettingsNetworkInterfacesRemovePattern" xml:space="preserve"><value>删除规则</value></data>
+  <data name="SettingsNetworkInterfacesWhitelist" xml:space="preserve"><value>白名单</value></data>
   <data name="SettingsPort" xml:space="preserve"><value>端口</value></data>
   <data name="SettingsPortDescription" xml:space="preserve"><value>Tonarink 的 LocalSend 兼容服务使用的 TCP 和 UDP 端口。</value></data>
   <data name="SettingsPortWarning" xml:space="preserve"><value>正在使用自定义端口。其他设备默认仍会查找 {port}，除非也改成相同值。</value></data>

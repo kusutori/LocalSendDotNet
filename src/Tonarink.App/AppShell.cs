@@ -275,7 +275,8 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 StartOrRestartServer,
                 StopServer))
                 .WithKey($"settings:{Props.Locale}"),
-            AppRoute.NetworkInterfaces => Component<NetworkInterfacesPage>(),
+            AppRoute.NetworkInterfaces => Component<NetworkInterfacesPage, NetworkInterfacesPageProps>(
+                new(settings, updateSettings)),
             _ => TextBlock(t.Message(new("App", "PageNotFound"))),
         }) with
         {
@@ -494,6 +495,8 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                     EnableHttps = settings.EnableHttps,
                     MulticastAddress = settings.ResolvedMulticastAddress,
                     DiscoveryTimeout = TimeSpan.FromMilliseconds(Math.Max(1, settings.DiscoveryTimeoutMs)),
+                    NetworkWhitelist = settings.NetworkWhitelist,
+                    NetworkBlacklist = settings.NetworkBlacklist,
                 });
                 nodeRef.Current = node;
                 ownerNodeSession.Current = session;
@@ -515,6 +518,8 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                     Error = null,
                     AppliedMulticastGroup = settings.ResolvedMulticastAddress.ToString(),
                     DiscoveryWarning = node.DiscoveryError,
+                    AppliedNetworkWhitelist = settings.NetworkWhitelist,
+                    AppliedNetworkBlacklist = settings.NetworkBlacklist,
                 });
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

@@ -19,7 +19,8 @@ internal sealed class V2MulticastDiscovery(
     private readonly SemaphoreSlim _announceGate = new(1, 1);
     private readonly SemaphoreSlim _receiverGate = new(1, 1);
     private readonly ConcurrentDictionary<IPAddress, byte> _registrations = new();
-    private readonly Func<IReadOnlyList<IPAddress>> _addressProvider = addressProvider ?? LocalNetworkAddresses.GetUnicastIPv4;
+    private readonly Func<IReadOnlyList<IPAddress>> _addressProvider = addressProvider
+        ?? (() => LocalNetworkAddresses.GetUnicastIPv4(options.NetworkWhitelist, options.NetworkBlacklist));
     private Socket? _receiver;
     private CancellationTokenSource? _receiverStop;
     private Task? _receiveLoop;

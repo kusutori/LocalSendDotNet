@@ -32,7 +32,9 @@ sealed record AppSettings(
     int Port,
     int DiscoveryTimeoutMs,
     bool EnableHttps,
-    string MulticastGroup)
+    string MulticastGroup,
+    IReadOnlyList<string>? NetworkWhitelist,
+    IReadOnlyList<string>? NetworkBlacklist)
 {
     public static readonly AppSettings Default = new(
         Alias: string.IsNullOrWhiteSpace(Environment.UserName) ? Environment.MachineName : Environment.UserName,
@@ -48,7 +50,9 @@ sealed record AppSettings(
         Port: LocalSendOptions.DefaultPort,
         DiscoveryTimeoutMs: 500,
         EnableHttps: true,
-        MulticastGroup: LocalSendOptions.DefaultMulticastAddress.ToString());
+        MulticastGroup: LocalSendOptions.DefaultMulticastAddress.ToString(),
+        NetworkWhitelist: null,
+        NetworkBlacklist: null);
 
     public string ResolvedAlias =>
         string.IsNullOrWhiteSpace(Alias) ? Default.Alias : Alias.Trim();
@@ -70,7 +74,9 @@ sealed record AppRuntimeState(
     IReadOnlyList<IncomingTransferRequest> IncomingTransfers,
     string? Error,
     string? AppliedMulticastGroup,
-    string? DiscoveryWarning)
+    string? DiscoveryWarning,
+    IReadOnlyList<string>? AppliedNetworkWhitelist,
+    IReadOnlyList<string>? AppliedNetworkBlacklist)
 {
     public static readonly AppRuntimeState Initial = new(
         LocalSendNodeState.Created,
@@ -79,7 +85,9 @@ sealed record AppRuntimeState(
         IncomingTransfers: Array.Empty<IncomingTransferRequest>(),
         Error: null,
         AppliedMulticastGroup: null,
-        DiscoveryWarning: null);
+        DiscoveryWarning: null,
+        AppliedNetworkWhitelist: null,
+        AppliedNetworkBlacklist: null);
 }
 
 sealed record OutgoingTransferViewState(

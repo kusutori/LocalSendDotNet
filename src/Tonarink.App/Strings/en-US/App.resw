@@ -183,7 +183,14 @@
   <data name="SettingsNetwork" xml:space="preserve"><value>Network</value></data>
   <data name="SettingsNetworkInterfaces" xml:space="preserve"><value>Network interfaces</value></data>
   <data name="SettingsNetworkInterfacesAll" xml:space="preserve"><value>All</value></data>
-  <data name="SettingsNetworkInterfacesPlaceholder" xml:space="preserve"><value>Adapter filtering is not available yet. This page is a placeholder for choosing which network interfaces Tonarink uses.</value></data>
+  <data name="SettingsNetworkInterfacesBlacklist" xml:space="preserve"><value>Blacklist</value></data>
+  <data name="SettingsNetworkInterfacesEmpty" xml:space="preserve"><value>No IPv4 network interfaces were found.</value></data>
+  <data name="SettingsNetworkInterfacesExample" xml:space="preserve"><value>Example:</value></data>
+  <data name="SettingsNetworkInterfacesInfo" xml:space="preserve"><value>By default, Tonarink uses every available network interface. You can exclude networks you do not need. Restart the server to apply changes.</value></data>
+  <data name="SettingsNetworkInterfacesPattern" xml:space="preserve"><value>Pattern {index}</value></data>
+  <data name="SettingsNetworkInterfacesPreview" xml:space="preserve"><value>Preview</value></data>
+  <data name="SettingsNetworkInterfacesRemovePattern" xml:space="preserve"><value>Remove pattern</value></data>
+  <data name="SettingsNetworkInterfacesWhitelist" xml:space="preserve"><value>Whitelist</value></data>
   <data name="SettingsPort" xml:space="preserve"><value>Port</value></data>
   <data name="SettingsPortDescription" xml:space="preserve"><value>TCP and UDP port used by Tonarink''s LocalSend-compatible service.</value></data>
   <data name="SettingsPortWarning" xml:space="preserve"><value>Custom port. Other devices still look for {port} unless they are changed too.</value></data>

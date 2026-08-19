@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0-preview.5
+
+- Add `NetworkWhitelist` and `NetworkBlacklist` on `LocalSendOptions` so discovery, announcements, and HTTP subnet scans can follow LocalSend-style IPv4 interface patterns.
+
 ## 0.2.0-preview.4
 
 - Update package and repository metadata for the Tonarink repository.

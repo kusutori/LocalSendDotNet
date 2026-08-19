@@ -3,6 +3,7 @@ using LocalSendDotNet;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
+using Microsoft.UI.Reactor.Localization;
 using Microsoft.UI.Reactor.Navigation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
@@ -43,7 +44,9 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 || !string.Equals(
                     Props.Runtime.AppliedMulticastGroup,
                     Props.Settings.ResolvedMulticastAddress.ToString(),
-                    StringComparison.Ordinal));
+                    StringComparison.Ordinal)
+                || !SameStringList(Props.Runtime.AppliedNetworkWhitelist, Props.Settings.NetworkWhitelist)
+                || !SameStringList(Props.Runtime.AppliedNetworkBlacklist, Props.Settings.NetworkBlacklist));
         var deviceTypeOptions = new[]
         {
             t.Message(new("App", "DeviceDesktop")),
@@ -227,7 +230,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
                             .MinWidth(160)),
                     SettingsCard(
                         header: t.Message(new("App", "SettingsNetworkInterfaces")),
-                        description: t.Message(new("App", "SettingsNetworkInterfacesAll")),
+                        description: NetworkInterfacesSummary(t, Props.Settings),
                         isClickEnabled: false,
                         isActionIconVisible: false,
                         content:
@@ -459,4 +462,22 @@ sealed class SettingsPage : Component<SettingsPageProps>
 
     private static LocalSendDeviceType DeviceTypeFromIndex(int index) =>
         index is >= 0 and < 5 ? DeviceTypes[index] : LocalSendDeviceType.Desktop;
+
+    private static string NetworkInterfacesSummary(IntlAccessor t, AppSettings settings)
+    {
+        if (settings.NetworkWhitelist is not null)
+            return t.Message(new("App", "SettingsNetworkInterfacesWhitelist"));
+        if (settings.NetworkBlacklist is not null)
+            return t.Message(new("App", "SettingsNetworkInterfacesBlacklist"));
+        return t.Message(new("App", "SettingsNetworkInterfacesAll"));
+    }
+
+    private static bool SameStringList(IReadOnlyList<string>? left, IReadOnlyList<string>? right)
+    {
+        if (ReferenceEquals(left, right))
+            return true;
+        if (left is null || right is null || left.Count != right.Count)
+            return false;
+        return left.SequenceEqual(right, StringComparer.Ordinal);
+    }
 }

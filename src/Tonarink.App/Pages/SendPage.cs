@@ -911,7 +911,7 @@ sealed class SendPage : Component<SendPageProps>
         Element searchingAnimation) =>
         FlexColumn(
             state == LocalSendNodeState.Faulted
-                ? Icon("Warning").AccessibilityHidden()
+                ? Icon("\uE783").AccessibilityHidden()
                 : searchingAnimation,
             Subtitle(state == LocalSendNodeState.Faulted
                 ? t.Message(new("App", "NetworkStartFailed"))

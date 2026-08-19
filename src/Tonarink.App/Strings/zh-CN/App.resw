@@ -160,8 +160,6 @@
   <data name="SettingsAboutIssues" xml:space="preserve"><value>报告问题</value></data>
   <data name="SettingsAboutLocalSend" xml:space="preserve"><value>LocalSend 官网</value></data>
   <data name="SettingsAboutVersion" xml:space="preserve"><value>版本 {version}</value></data>
-  <data name="SettingsAnimations" xml:space="preserve"><value>动画效果</value></data>
-  <data name="SettingsAnimationsDescription" xml:space="preserve"><value>启用页面切换和状态过渡动画。</value></data>
   <data name="SettingsAutoSave" xml:space="preserve"><value>自动保存</value></data>
   <data name="SettingsAutoSaveDescription" xml:space="preserve"><value>自动接受并保存收到的内容。</value></data>
   <data name="SettingsDeviceModel" xml:space="preserve"><value>设备型号</value></data>

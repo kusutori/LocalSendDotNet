@@ -106,15 +106,7 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 isActionIconVisible: false,
                 content:
                 ToggleSwitch(Props.Settings.StartWithWindows, value =>
-                    _ = SetStartupAsync(value))),
-            SettingsCard(
-                header: t.Message(new("App", "SettingsAnimations")),
-                description: t.Message(new("App", "SettingsAnimationsDescription")),
-                isClickEnabled: false,
-                isActionIconVisible: false,
-                content:
-                ToggleSwitch(Props.Settings.AnimationsEnabled, value =>
-                    Props.UpdateSettings(settings => settings with { AnimationsEnabled = value }))));
+                    _ = SetStartupAsync(value))));
 
         var receiveCards = SettingsGroup(
             t.Message(new("App", "SettingsReceive")),

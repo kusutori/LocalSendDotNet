@@ -73,7 +73,7 @@ sealed class AppShell : Component
             _ => ElementTheme.Default,
         };
         var startHidden = AppPlatform.StartHidden && settings.MinimizeToTray;
-        var (splashVisible, _) = UseState(!startHidden && settings.AnimationsEnabled);
+        var (splashVisible, _) = UseState(!startHidden);
 
         var shell = LocaleProvider(
             locale,
@@ -281,9 +281,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         {
             CacheMode = NavigationCacheMode.Enabled,
             CacheSize = 3,
-            Transition = settings.AnimationsEnabled
-                ? NavigationTransition.Fade(TimeSpan.FromMilliseconds(160))
-                : NavigationTransition.None,
+            Transition = NavigationTransition.Fade(TimeSpan.FromMilliseconds(160)),
         };
 
         var navigationView = (NavigationView(

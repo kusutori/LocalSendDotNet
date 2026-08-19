@@ -51,7 +51,6 @@ sealed class AppSettingsFile
     public int? LanguageIndex { get; set; }
     public bool? MinimizeToTray { get; set; }
     public bool? StartWithWindows { get; set; }
-    public bool? AnimationsEnabled { get; set; }
     public bool? FavoritesOnly { get; set; }
     public string? DownloadDirectory { get; set; }
     public string? DeviceType { get; set; }
@@ -69,7 +68,6 @@ sealed class AppSettingsFile
         LanguageIndex = settings.LanguageIndex,
         MinimizeToTray = settings.MinimizeToTray,
         StartWithWindows = settings.StartWithWindows,
-        AnimationsEnabled = settings.AnimationsEnabled,
         FavoritesOnly = settings.FavoritesOnly,
         DownloadDirectory = settings.DownloadDirectory,
         DeviceType = settings.DeviceType.ToString(),
@@ -97,7 +95,6 @@ sealed class AppSettingsFile
             LanguageIndex = LanguageIndex is >= 0 and <= 2 ? LanguageIndex.Value : defaults.LanguageIndex,
             MinimizeToTray = MinimizeToTray ?? defaults.MinimizeToTray,
             StartWithWindows = StartWithWindows ?? defaults.StartWithWindows,
-            AnimationsEnabled = AnimationsEnabled ?? defaults.AnimationsEnabled,
             FavoritesOnly = autoSave == AutoSaveMode.Favorites,
             DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirectory)
                 ? defaults.DownloadDirectory

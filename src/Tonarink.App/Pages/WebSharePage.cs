@@ -81,7 +81,7 @@ sealed class WebSharePage : Component<WebSharePageProps>
 
         var https = encrypted;
         var port = Props.Runtime.Identity?.Port ?? Props.Settings.Port;
-        var urls = AppNetworkAddresses.ListIpv4(Props.Settings)
+        var urls = AppNetworkAddresses.ListWebShareIpv4(Props.Settings)
             .Select(address => $"{(https ? "https" : "http")}://{address}:{port}")
             .ToArray();
         if (urls.Length == 0)

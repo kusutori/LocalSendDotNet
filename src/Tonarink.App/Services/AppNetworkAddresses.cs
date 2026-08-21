@@ -6,8 +6,26 @@ using LocalSendDotNet;
 static class AppNetworkAddresses
 {
     public static IReadOnlyList<string> ListIpv4(AppSettings settings)
+        => OrderAddresses(ListAddressCandidates(settings.NetworkWhitelist, settings.NetworkBlacklist));
+
+    public static IReadOnlyList<string> ListWebShareIpv4(AppSettings settings)
     {
-        var addresses = new List<string>();
+        var candidates = ListAddressCandidates(settings.NetworkWhitelist, settings.NetworkBlacklist);
+        if (candidates.Count == 0)
+            candidates = ListAddressCandidates(whitelist: null, blacklist: null);
+
+        if (candidates.Count == 0)
+            return [];
+
+        var bestPriority = candidates.Min(static item => item.Priority);
+        return OrderAddresses(candidates.Where(item => item.Priority == bestPriority));
+    }
+
+    private static IReadOnlyList<(string Address, int Priority)> ListAddressCandidates(
+        IReadOnlyList<string>? whitelist,
+        IReadOnlyList<string>? blacklist)
+    {
+        var addresses = new List<(string Address, int Priority)>();
         foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
         {
             if (nic.OperationalStatus != OperationalStatus.Up
@@ -24,13 +42,45 @@ static class AppNetworkAddresses
                 continue;
             if (NetworkAddressPatterns.IsInterfaceIgnored(
                 interfaceAddresses,
-                settings.NetworkWhitelist,
-                settings.NetworkBlacklist))
+                whitelist,
+                blacklist))
                 continue;
 
-            addresses.AddRange(interfaceAddresses);
+            var hasGateway = nic.GetIPProperties().GatewayAddresses.Any(static gateway =>
+                gateway.Address.AddressFamily == AddressFamily.InterNetwork
+                && !gateway.Address.Equals(IPAddress.Any));
+            addresses.AddRange(interfaceAddresses.Select(address =>
+                (address, AddressPriority(IPAddress.Parse(address), hasGateway))));
         }
 
-        return addresses.Distinct(StringComparer.Ordinal).ToArray();
+        return addresses
+            .GroupBy(static item => item.Address, StringComparer.Ordinal)
+            .Select(static group => group.MinBy(static item => item.Priority))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string> OrderAddresses(
+        IEnumerable<(string Address, int Priority)> addresses) =>
+        addresses
+            .OrderBy(static item => item.Priority)
+            .ThenBy(static item => item.Address, StringComparer.Ordinal)
+            .Select(static item => item.Address)
+            .ToArray();
+
+    private static int AddressPriority(IPAddress address, bool hasGateway)
+    {
+        var octets = address.GetAddressBytes();
+        var isAutomaticPrivate = octets[0] == 169 && octets[1] == 254;
+        var isPrivate = octets[0] == 10
+            || octets[0] == 172 && octets[1] is >= 16 and <= 31
+            || octets[0] == 192 && octets[1] == 168;
+
+        if (isPrivate && hasGateway)
+            return 0;
+        if (isPrivate)
+            return 1;
+        if (hasGateway && !isAutomaticPrivate)
+            return 2;
+        return isAutomaticPrivate ? 4 : 3;
     }
 }

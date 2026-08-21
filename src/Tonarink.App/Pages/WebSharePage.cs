@@ -1,4 +1,5 @@
 using LocalSendDotNet;
+using Microsoft.UI.Reactor.Animation;
 using Microsoft.UI.Reactor;
 using Microsoft.UI.Reactor.Core;
 using Microsoft.UI.Reactor.Layout;
@@ -32,7 +33,16 @@ sealed class WebSharePage : Component<WebSharePageProps>
         var (qrPath, setQrPath) = UseState<string?>(null);
         var (qrUrl, setQrUrl) = UseState<string?>(null);
         var (zoomUrl, setZoomUrl) = UseState<string?>(null);
+        var (copyFeedback, setCopyFeedback) = UseState<(string Url, int Version)?>(null);
+        var copyFeedbackVersion = UseRef(0);
+        var alive = UseRef(true);
         var node = Props.Node;
+
+        UseEffect(() => () =>
+        {
+            alive.Current = false;
+            copyFeedbackVersion.Current++;
+        });
 
         UseNavigationLifecycle(onNavigatedFrom: _ =>
         {
@@ -90,7 +100,13 @@ sealed class WebSharePage : Component<WebSharePageProps>
                 TextBlock(t.Message(new("App", "WebShareOpenLink")))
                     .SemiBold(),
                 VStack(8, urls.Select(url =>
-                    LinkBar(t, url, ShowQr, setZoomUrl).WithKey(url)).ToArray<Element?>()),
+                    LinkBar(
+                        t,
+                        url,
+                        copyFeedback?.Url == url ? copyFeedback.Value.Version : 0,
+                        () => _ = CopyWithFeedbackAsync(url),
+                        ShowQr,
+                        setZoomUrl).WithKey(url)).ToArray<Element?>()),
                 VStack(8,
                     BodyStrong(t.Message(new("App", "WebShareRequests"))),
                     requestBody),
@@ -208,9 +224,24 @@ sealed class WebSharePage : Component<WebSharePageProps>
             {
             }
         }
+
+        async Task CopyWithFeedbackAsync(string url)
+        {
+            if (!await CopyAsync(url).ConfigureAwait(true) || !alive.Current)
+                return;
+
+            var version = ++copyFeedbackVersion.Current;
+            setCopyFeedback((url, version));
+        }
     }
 
-    private static Element LinkBar(IntlAccessor t, string url, Action<string> showQr, Action<string?> setZoom) =>
+    private static Element LinkBar(
+        IntlAccessor t,
+        string url,
+        int copySuccessVersion,
+        Action copy,
+        Action<string> showQr,
+        Action<string?> setZoom) =>
         Border(
             Grid(
                 columns: [GridSize.Star(), GridSize.Auto, GridSize.Auto, GridSize.Auto],
@@ -221,7 +252,14 @@ sealed class WebSharePage : Component<WebSharePageProps>
                     .VAlign(VerticalAlignment.Center)
                     .ToolTip(url)
                     .Grid(column: 0),
-                IconButton("\uE8C8", t.Message(new("App", "WebShareCopy")), () => Copy(url))
+                CopyButton(
+                        copySuccessVersion,
+                        t.Message(new("App", "WebShareCopy")),
+                        copy)
+                    .AutomationName(t.Message(new("App", "WebShareCopy")))
+                    .ToolTip(t.Message(new("App", "WebShareCopy")))
+                    .MinWidth(40)
+                    .MinHeight(40)
                     .Grid(column: 1),
                 IconButton("\uED14", t.Message(new("App", "WebShareQr")), () => showQr(url))
                     .Grid(column: 2),
@@ -233,6 +271,51 @@ sealed class WebSharePage : Component<WebSharePageProps>
             .Padding(horizontal: 16, vertical: 8)
             .CornerRadius(8)
             .Background(Theme.SubtleFill);
+
+    private static ButtonElement CopyButton(int successVersion, string name, Action copy)
+    {
+        var copyIcon = Icon(FontIcon("\uE8C8", fontSize: 16));
+        var successIcon = Icon(FontIcon("\uE73E", fontSize: 16))
+            .Opacity(0);
+
+        if (successVersion > 0)
+        {
+            copyIcon = copyIcon.Keyframes("copy-feedback-out", successVersion, keyframes => keyframes
+                .Duration(1433)
+                .At(0.000f, opacity: 1, scale: new(1, 1, 1))
+                .At(0.093f, opacity: 0, scale: new(0.273f, 0.273f, 1),
+                    easing: Easing.CubicBezier(0.13f, 0, 0, 1))
+                .At(0.814f, opacity: 0, scale: new(0.273f, 0.273f, 1))
+                .At(0.837f, opacity: 0, scale: new(1, 1, 1))
+                .At(0.907f, opacity: 0, scale: new(1, 1, 1))
+                .At(1.000f, opacity: 1, scale: new(1, 1, 1), easing: Easing.EaseOut));
+
+            successIcon = successIcon.Keyframes("copy-feedback-in", successVersion, keyframes => keyframes
+                .Duration(1433)
+                .At(0.000f, opacity: 0, scale: new(0.385f, 0.385f, 1))
+                .At(0.093f, opacity: 0, scale: new(0.385f, 0.385f, 1))
+                .At(0.186f, opacity: 1, scale: new(1.146f, 1.146f, 1),
+                    easing: Easing.CubicBezier(0.39f, 0, 0.63f, 1))
+                .At(0.232f, opacity: 1, scale: new(1, 1, 1),
+                    easing: Easing.CubicBezier(0.55f, 0, 0.02f, 1))
+                .At(0.814f, opacity: 1, scale: new(1, 1, 1))
+                .At(0.907f, opacity: 0, scale: new(0.385f, 0.385f, 1),
+                    easing: Easing.EaseIn)
+                .At(1.000f, opacity: 0, scale: new(0.385f, 0.385f, 1)));
+        }
+
+        return Button(
+                Grid(
+                        columns: [GridSize.Auto],
+                        rows: [GridSize.Auto],
+                        copyIcon,
+                        successIcon)
+                    .Width(16)
+                    .Height(16),
+                copy)
+            .SubtleButton()
+            .AutomationName(name);
+    }
 
     private static Element RequestCard(IntlAccessor t, WebShareRequest request, LocalSendNode? node) =>
         Border(
@@ -273,12 +356,48 @@ sealed class WebSharePage : Component<WebSharePageProps>
             .MinWidth(40)
             .MinHeight(40);
 
-    private static void Copy(string url)
+    private static async Task<bool> CopyAsync(string url)
     {
-        var package = new DataPackage();
-        package.SetText(url);
-        Clipboard.SetContent(package);
-        Clipboard.Flush();
+        const int maximumAttempts = 3;
+
+        for (var attempt = 1; attempt <= maximumAttempts; attempt++)
+        {
+            try
+            {
+                var package = new DataPackage();
+                package.SetText(url);
+
+                if (!Clipboard.SetContentWithOptions(package, new ClipboardContentOptions()))
+                {
+                    if (attempt < maximumAttempts)
+                        await Task.Delay(50).ConfigureAwait(true);
+                    continue;
+                }
+
+                try
+                {
+                    Clipboard.Flush();
+                }
+                catch
+                {
+                    // The text is already available for this app lifetime. Flush only
+                    // keeps it available after exit and may fail if another process
+                    // briefly locks the clipboard.
+                }
+
+                return true;
+            }
+            catch when (attempt < maximumAttempts)
+            {
+                await Task.Delay(50).ConfigureAwait(true);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     private static string RandomPin()

@@ -215,6 +215,7 @@
   <data name="SettingsStopServer" xml:space="preserve"><value>Stop server</value></data>
   <data name="SettingsStartWithWindows" xml:space="preserve"><value>Start after signing in</value></data>
   <data name="SettingsStartWithWindowsDescription" xml:space="preserve"><value>Run Tonarink automatically after signing in to Windows.</value></data>
+  <data name="ExplorerCommandTitle" xml:space="preserve"><value>Send with Tonarink</value></data>
   <data name="SettingsExplorerContextMenu" xml:space="preserve"><value>Show in File Explorer</value></data>
   <data name="SettingsExplorerContextMenuDescription" xml:space="preserve"><value>Add “Send with Tonarink” to the Windows 11 context menu. Applies to the packaged app.</value></data>
   <data name="StartupDisabledByPolicy" xml:space="preserve"><value>Windows policy is blocking Tonarink from starting at sign-in.</value></data>

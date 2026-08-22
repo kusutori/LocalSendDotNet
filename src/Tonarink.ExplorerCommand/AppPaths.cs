@@ -10,7 +10,6 @@ internal static partial class AppPaths
     public const string ShareFolderName = "explorer-share";
     public const string SettingsFileName = "settings.json";
     public const string MenuSettingName = "ShowExplorerContextMenu";
-    public const string LanguageSettingName = "LanguageIndex";
     public const string UnpackagedPublisher = "kusutori";
     public const string UnpackagedProduct = "Tonarink";
     public const string AppExeName = "Tonarink.exe";
@@ -51,17 +50,7 @@ internal static partial class AppPaths
         return true;
     }
 
-    public static string MenuTitle()
-    {
-        var languageIndex = ReadLanguageIndex();
-        var chinese = languageIndex switch
-        {
-            1 => true,
-            2 => false,
-            _ => IsChineseUi(),
-        };
-        return chinese ? "使用 Tonarink 发送" : "Send with Tonarink";
-    }
+    public static string MenuTitle() => ExplorerStrings.Title();
 
     public static string? IconResource()
     {
@@ -198,7 +187,7 @@ internal static partial class AppPaths
         return false;
     }
 
-    private static IEnumerable<string> SettingsDirectories()
+    internal static IEnumerable<string> SettingsDirectories()
     {
         if (TryGetPackageFamilyName(out var family))
         {
@@ -219,37 +208,6 @@ internal static partial class AppPaths
         }
 
         yield return SharedDataDirectory;
-    }
-
-    private static int ReadLanguageIndex()
-    {
-        try
-        {
-            foreach (var directory in SettingsDirectories())
-            {
-                var path = Path.Combine(directory, SettingsFileName);
-                if (!File.Exists(path))
-                    continue;
-
-                using var document = JsonDocument.Parse(File.ReadAllText(path));
-                if (document.RootElement.TryGetProperty(LanguageSettingName, out var value)
-                    && value.TryGetInt32(out var index))
-                {
-                    return index;
-                }
-            }
-        }
-        catch
-        {
-        }
-
-        return 0;
-    }
-
-    private static bool IsChineseUi()
-    {
-        var language = GetUserDefaultUILanguage();
-        return (language & 0xFF) == 0x04;
     }
 
     private static bool TryFindInstalledPackageFamilyName(out string family)
@@ -307,7 +265,7 @@ internal static partial class AppPaths
         return family.Length > 0;
     }
 
-    private static bool TryGetCurrentPackagePath(out string path)
+    internal static bool TryGetCurrentPackagePath(out string path)
     {
         path = "";
         uint length = 32768;
@@ -341,9 +299,6 @@ internal static partial class AppPaths
 
     [LibraryImport("kernel32.dll")]
     private static unsafe partial int GetCurrentPackagePath(ref uint pathLength, char* path);
-
-    [LibraryImport("kernel32.dll")]
-    private static partial ushort GetUserDefaultUILanguage();
 
     [LibraryImport("ole32.dll")]
     private static partial int CoCreateInstance(in Guid rclsid, nint pUnkOuter, uint dwClsContext, in Guid riid, out nint ppv);

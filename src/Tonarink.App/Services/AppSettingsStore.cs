@@ -49,6 +49,7 @@ sealed class AppSettingsFile
     public string? AutoSave { get; set; }
     public int? ThemeIndex { get; set; }
     public int? LanguageIndex { get; set; }
+    public string? Language { get; set; }
     public bool? MinimizeToTray { get; set; }
     public bool? StartWithWindows { get; set; }
     public bool? FavoritesOnly { get; set; }
@@ -69,6 +70,12 @@ sealed class AppSettingsFile
         AutoSave = settings.AutoSave.ToString(),
         ThemeIndex = settings.ThemeIndex,
         LanguageIndex = settings.LanguageIndex,
+        Language = settings.LanguageIndex switch
+        {
+            1 => "zh-CN",
+            2 => "en-US",
+            _ => null,
+        },
         MinimizeToTray = settings.MinimizeToTray,
         StartWithWindows = settings.StartWithWindows,
         FavoritesOnly = settings.FavoritesOnly,

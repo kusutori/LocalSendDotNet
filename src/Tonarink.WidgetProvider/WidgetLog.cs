@@ -3,7 +3,9 @@ namespace Tonarink.WidgetProvider;
 internal static class WidgetLog
 {
     private static readonly string Path = System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        "AppData",
+        "Local",
         "kusutori",
         "Tonarink",
         "widget-provider.log");

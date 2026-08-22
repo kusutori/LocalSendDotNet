@@ -102,7 +102,7 @@ qualified assets), named after the package identity. A PNG-only
 `resources.pri` becomes the package primary map and WinUI fail-fasts at
 startup (`Microsoft.UI.Xaml.dll`, `0xc000027b`) before any window appears.
 Windows 11 widgets are **not** in the default package. Opt in with
-`-p:TonarinkWidgets=true` on a packaged build; that injects
+`-p:TonarinkWidgets=true` on a packaged or Native AOT publish; that injects
 `Package.Widgets.extensions.xml` into the manifest and copies a Native AOT
 `Tonarink.WidgetProvider.exe` (~3 MB) plus templates and icons. The host
 shares the package's Windows App SDK runtime instead of bundling a second
@@ -119,6 +119,9 @@ Copy-Item src/Tonarink.App/Package.appxmanifest `
   artifacts/publish/native-aot/win-x64/AppxManifest.xml
 Copy-Item src/Tonarink.App/Assets/*.png, src/Tonarink.App/Assets/*.ico `
   artifacts/publish/native-aot/win-x64/Assets
+# Widgets flavor: add -p:TonarinkWidgets=true to publish, then
+# ./tools/Add-WidgetManifestExtensions.ps1 -Source src/Tonarink.App/Package.appxmanifest `
+#   -Destination artifacts/publish/native-aot/win-x64/AppxManifest.xml
 ./tools/New-AotMsixResourcesPri.ps1 `
   -LayoutPath artifacts/publish/native-aot/win-x64
 

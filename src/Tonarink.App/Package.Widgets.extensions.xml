@@ -33,7 +33,7 @@
             <Definition
               Id="Tonarink_Receive"
               DisplayName="Tonarink"
-              Description="Show this PC name and address so nearby devices can send files."
+              Description="Nearby devices, receive history, and transfer progress."
               AllowMultiple="true">
               <Capabilities>
                 <Capability>

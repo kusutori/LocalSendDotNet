@@ -1,6 +1,3 @@
-using System.Diagnostics;
-using Microsoft.Windows.Widgets.Providers;
-
 namespace Tonarink.WidgetProvider;
 
 internal sealed class ReceiveWidget
@@ -9,12 +6,17 @@ internal sealed class ReceiveWidget
     private static readonly string TemplatePath = Path.Combine(AppContext.BaseDirectory, "Templates", "ReceiveWidget.json");
     private static string? Template;
 
-    public ReceiveWidget(string widgetId)
+    public ReceiveWidget(string widgetId, string page = WidgetSnapshot.NearbyPage)
     {
         Id = widgetId;
+        Page = string.Equals(page, WidgetSnapshot.HistoryPage, StringComparison.Ordinal)
+            ? WidgetSnapshot.HistoryPage
+            : WidgetSnapshot.NearbyPage;
     }
 
     public string Id { get; }
+
+    public string Page { get; set; }
 
     public static string GetTemplate()
     {
@@ -27,20 +29,5 @@ internal sealed class ReceiveWidget
         return Template;
     }
 
-    public static string GetData() => WidgetSnapshot.Capture().ToJson();
-
-    public static void OpenApp()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "tonarink:",
-                UseShellExecute = true,
-            });
-        }
-        catch
-        {
-        }
-    }
+    public string GetData() => WidgetSnapshot.Capture(Page);
 }

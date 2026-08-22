@@ -4,10 +4,18 @@ if (await ShareTargetActivationBroker.RedirectToPrimaryInstanceAsync())
     return;
 
 ToolkitXamlMetadata.Register();
-ReactorApp.Run(_ =>
+WidgetAppHost.Start();
+try
 {
-    ReactorApp.ShutdownPolicy = ShutdownPolicy.OnLastSurfaceClosed;
-    var settings = AppSettingsStore.Load();
-    AppWindows.OpenMain(startHidden: AppPlatform.StartHidden && settings.MinimizeToTray);
-    AppNotificationService.Initialize();
-});
+    ReactorApp.Run(_ =>
+    {
+        ReactorApp.ShutdownPolicy = ShutdownPolicy.OnLastSurfaceClosed;
+        var settings = AppSettingsStore.Load();
+        AppWindows.OpenMain(startHidden: AppPlatform.StartHidden && settings.MinimizeToTray);
+        AppNotificationService.Initialize();
+    });
+}
+finally
+{
+    WidgetAppHost.Stop();
+}

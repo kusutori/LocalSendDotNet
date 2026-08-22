@@ -167,6 +167,20 @@ sealed class IncomingTransferOverlay : Component<IncomingTransferOverlayProps>
 
         UseEffect(() => UpdateTaskbarProgress(window, taskbarProgress), taskbarProgress);
         UseEffect(() => () => ClearTaskbarProgress(window));
+        UseEffect(() =>
+        {
+            WidgetAppHost.SetIncoming(new WidgetTransferInfo(
+                Title: request.Items.Count == 1
+                    ? request.Items[0].FileName
+                    : view.Status,
+                Peer: request.Sender.Alias,
+                Status: view.Status,
+                BytesTransferred: view.BytesTransferred,
+                TotalBytes: view.TotalBytes,
+                Indeterminate: view.TotalBytes <= 0
+                    || view.State is TransferState.Preparing or TransferState.WaitingForAcceptance));
+            return () => WidgetAppHost.SetIncoming(null);
+        }, view.State, view.BytesTransferred, view.TotalBytes, view.Status, request.RequestId);
 
         var acceptMutation = UseMutation<bool, TransferResult>(async (_, mutationToken) =>
         {

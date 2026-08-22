@@ -128,6 +128,7 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
         var nextNodeSession = UseRef(0);
         var ownerNodeSession = UseRef(0);
         var mouseBackHandler = UseRef<PointerEventHandler?>(null);
+        var handleWidgetCommand = UseRef<Action<string>?>(null);
 
         UseEffect(() =>
         {
@@ -238,6 +239,44 @@ sealed class LocalizedAppShell : Component<LocalizedAppShellProps>
                 }
             };
         }, serverDesired, serverEpoch, httpsOverride);
+
+        UseEffect(() => WidgetAppHost.Update(runtime, settings, outgoingTransfer, serverDesired),
+            runtime,
+            settings,
+            serverDesired,
+            outgoingTransfer is null,
+            outgoingTransfer?.BytesTransferred ?? 0,
+            outgoingTransfer?.TotalBytes ?? 0,
+            (int?)outgoingTransfer?.State ?? -1);
+
+        UseEffect(() =>
+        {
+            void OnCommand(string verb) => handleWidgetCommand.Current?.Invoke(verb);
+            WidgetAppHost.CommandReceived += OnCommand;
+            return () => WidgetAppHost.CommandReceived -= OnCommand;
+        });
+
+        handleWidgetCommand.Current = verb =>
+        {
+            if (string.Equals(verb, "open", StringComparison.OrdinalIgnoreCase))
+            {
+                RestoreWindow();
+                return;
+            }
+
+            if (string.Equals(verb, "stop-server", StringComparison.OrdinalIgnoreCase)
+                || (string.Equals(verb, "toggle-server", StringComparison.OrdinalIgnoreCase) && serverDesired))
+            {
+                StopServer();
+                return;
+            }
+
+            if (string.Equals(verb, "start-server", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(verb, "toggle-server", StringComparison.OrdinalIgnoreCase))
+            {
+                StartOrRestartServer();
+            }
+        };
 
         var titleBar = (TitleBar("Tonarink") with
         {

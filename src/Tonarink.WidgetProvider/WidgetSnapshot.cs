@@ -1,154 +1,179 @@
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace Tonarink.WidgetProvider;
 
-internal sealed record WidgetSnapshot(
-    string Title,
-    string Alias,
-    string Address,
-    string Status,
-    string OpenLabel)
+internal static class WidgetSnapshot
 {
-    private const string SettingsFileName = "settings.json";
-    private const int DefaultPort = 53317;
+    public const string NearbyPage = "nearby";
+    public const string HistoryPage = "history";
 
-    public static WidgetSnapshot Capture()
+    public static bool ServerIsOn()
     {
-        var settings = ReadSettings();
-        var chinese = IsChinese(settings.Language);
-        var alias = string.IsNullOrWhiteSpace(settings.Alias)
-            ? (string.IsNullOrWhiteSpace(Environment.UserName) ? Environment.MachineName : Environment.UserName)
-            : settings.Alias.Trim();
-        var port = settings.Port is >= 1 and <= ushort.MaxValue ? settings.Port.Value : DefaultPort;
-        var addresses = ListIpv4();
-        var address = addresses.Count == 0
-            ? (chinese ? $"端口 {port}" : $"Port {port}")
-            : string.Join(chinese ? "，" : ", ", addresses.Select(item => $"{item}:{port}"));
+        if (!WidgetCommands.AppIsRunning())
+            return false;
 
-        return new(
-            Title: "Tonarink",
-            Alias: alias,
-            Address: address,
-            Status: chinese ? "可以接收附近设备发来的文件。" : "Ready to receive files from nearby devices.",
-            OpenLabel: chinese ? "打开 Tonarink" : "Open Tonarink");
+        return ReadSnapshot() is { ServerRunning: true };
     }
 
-    public string ToJson() =>
-        $$"""{"title":{{Quote(Title)}},"alias":{{Quote(Alias)}},"address":{{Quote(Address)}},"status":{{Quote(Status)}},"openLabel":{{Quote(OpenLabel)}}}""";
+    public static bool ServerIsBusy() =>
+        WidgetCommands.AppIsRunning() && ReadSnapshot() is { ServerBusy: true };
 
-    private static string Quote(string value) => $"\"{JsonEncodedText.Encode(value)}\"";
+    public static string Capture(string page)
+    {
+        var appRunning = WidgetCommands.AppIsRunning();
+        var snapshot = ReadSnapshot();
+        var chinese = IsChinese(snapshot?.Language);
+        var serverOn = appRunning && snapshot is { ServerRunning: true };
+        var devices = appRunning && serverOn
+            ? snapshot?.Devices ?? []
+            : [];
+        var history = ReadHistory();
+        var transfer = appRunning ? snapshot?.Transfer : null;
+        var hasTransfer = transfer is not null
+            && !string.IsNullOrWhiteSpace(transfer.Title);
+        var isNearby = !string.Equals(page, HistoryPage, StringComparison.Ordinal);
+        var emptyLabel = !appRunning
+            ? (chinese ? "应用未开启" : "App is closed")
+            : !serverOn
+                ? (chinese ? "接收已停止" : "Receiving is off")
+                : (chinese ? "无设备" : "No devices");
 
-    private static (string? Alias, int? Port, string? Language) ReadSettings()
+        var percent = transfer is null || transfer.TotalBytes <= 0
+            ? 0
+            : (int)Math.Clamp(transfer.BytesTransferred * 100d / transfer.TotalBytes, 0, 100);
+
+        var data = new WidgetCardData
+        {
+            Title = "Tonarink",
+            AppRunning = appRunning,
+            AppStatusLabel = appRunning
+                ? (chinese ? "已开启" : "Running")
+                : (chinese ? "未开启" : "Closed"),
+            StatusIcon = appRunning ? WidgetPaths.StatusOnIcon : WidgetPaths.StatusOffIcon,
+            ServerOn = serverOn,
+            ServerLabel = chinese ? "接收服务" : "Receive",
+            ServerValue = serverOn ? (chinese ? "开" : "On") : (chinese ? "关" : "Off"),
+            ServerHint = !appRunning
+                ? (chinese ? "打开应用后才能发现设备和接收文件。" : "Open the app to discover devices and receive files.")
+                : serverOn
+                    ? (chinese ? "附近设备可以发送文件。" : "Nearby devices can send files.")
+                    : (chinese ? "点击开启接收。" : "Tap to start receiving."),
+            IsNearby = isNearby,
+            IsHistory = !isNearby,
+            HasTransfer = hasTransfer,
+            HasProgressBar = hasTransfer && transfer is { Indeterminate: false, TotalBytes: > 0 },
+            HasDevices = devices.Count > 0,
+            HasHistoryItems = history.Count > 0,
+            DeviceCount = devices.Count,
+            DeviceCountLabel = chinese
+                ? $"附近 {devices.Count} 台"
+                : $"{devices.Count} nearby",
+            HistoryCountLabel = chinese
+                ? $"历史 {history.Count} 条"
+                : $"{history.Count} in history",
+            EmptyLabel = emptyLabel,
+            HistoryEmptyLabel = chinese ? "无历史记录" : "No history",
+            NearbyTab = chinese ? "附近" : "Nearby",
+            HistoryTab = chinese ? "历史" : "History",
+            NearbyWeight = isNearby ? "bolder" : "default",
+            HistoryWeight = isNearby ? "default" : "bolder",
+            OpenLabel = chinese ? "打开 Tonarink" : "Open Tonarink",
+            TransferTitle = transfer?.Title ?? "",
+            TransferPeer = transfer is null
+                ? ""
+                : transfer.Incoming
+                    ? (chinese ? $"来自 {transfer.Peer}" : $"From {transfer.Peer}")
+                    : (chinese ? $"发送到 {transfer.Peer}" : $"To {transfer.Peer}"),
+            TransferStatus = transfer?.Status ?? "",
+            TransferProgress = transfer is null
+                ? ""
+                : transfer.Indeterminate || transfer.TotalBytes <= 0
+                    ? ""
+                    : $"{FormatBytes(transfer.BytesTransferred)} / {FormatBytes(transfer.TotalBytes)}  {percent}%",
+            ProgressFilled = Math.Max(percent, 1),
+            ProgressRest = Math.Max(100 - percent, 1),
+            Devices = devices.Take(8).Select(static device => new WidgetCardRow
+            {
+                Alias = string.IsNullOrWhiteSpace(device.Alias) ? "?" : device.Alias.Trim(),
+                Icon = WidgetPaths.DeviceIcon(device.Type),
+            }).ToList(),
+            History = history.Take(8).Select(item => new WidgetCardRow
+            {
+                FileName = item.FileName,
+                Detail = string.IsNullOrWhiteSpace(item.Detail) ? item.FileName : item.Detail,
+            }).ToList(),
+        };
+
+        return JsonSerializer.Serialize(data, WidgetJsonContext.Default.WidgetCardData);
+    }
+
+    private static WidgetSnapshotFile? ReadSnapshot()
     {
         try
         {
-            foreach (var directory in SettingsDirectories())
-            {
-                var path = Path.Combine(directory, SettingsFileName);
-                if (!File.Exists(path))
-                    continue;
+            var path = WidgetPaths.SnapshotPath();
+            if (!File.Exists(path))
+                return null;
 
-                using var document = JsonDocument.Parse(File.ReadAllText(path));
-                var root = document.RootElement;
-                var alias = root.TryGetProperty("Alias", out var aliasValue) && aliasValue.ValueKind == JsonValueKind.String
-                    ? aliasValue.GetString()
-                    : null;
-                var language = root.TryGetProperty("Language", out var languageValue) && languageValue.ValueKind == JsonValueKind.String
-                    ? languageValue.GetString()
-                    : null;
-                int? port = root.TryGetProperty("Port", out var portValue) && portValue.TryGetInt32(out var parsed)
-                    ? parsed
-                    : null;
-                return (alias, port, language);
-            }
+            return JsonSerializer.Deserialize(
+                File.ReadAllText(path),
+                WidgetJsonContext.Default.WidgetSnapshotFile);
         }
         catch
         {
+            return null;
         }
-
-        return (null, null, null);
     }
 
-    private static IEnumerable<string> SettingsDirectories()
+    private static IReadOnlyList<(string FileName, string Detail)> ReadHistory()
     {
-        string? packaged = null;
         try
         {
-            var package = Windows.ApplicationModel.Package.Current;
-            packaged = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Packages",
-                package.Id.FamilyName,
-                "LocalState");
-        }
-        catch
-        {
-        }
+            var path = WidgetPaths.HistoryPath();
+            if (!File.Exists(path))
+                return [];
 
-        if (packaged is not null)
-            yield return packaged;
+            var file = JsonSerializer.Deserialize(
+                File.ReadAllText(path),
+                WidgetJsonContext.Default.ReceiveHistoryFile);
+            if (file?.Items is not { Count: > 0 })
+                return [];
 
-        yield return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "kusutori",
-            "Tonarink");
-    }
-
-    private static IReadOnlyList<string> ListIpv4()
-    {
-        var addresses = new List<string>();
-        try
-        {
-            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                if (nic.OperationalStatus != OperationalStatus.Up
-                    || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-                    continue;
-
-                foreach (var item in nic.GetIPProperties().UnicastAddresses)
+            return file.Items
+                .Select(static item =>
                 {
-                    if (item.Address.AddressFamily != AddressFamily.InterNetwork
-                        || IPAddress.IsLoopback(item.Address))
-                        continue;
-
-                    var value = item.Address.ToString();
-                    if (!addresses.Contains(value, StringComparer.Ordinal))
-                        addresses.Add(value);
-                }
-            }
+                    var name = string.IsNullOrWhiteSpace(item.FileName) ? "?" : item.FileName.Trim();
+                    var sender = string.IsNullOrWhiteSpace(item.SenderAlias) ? "?" : item.SenderAlias.Trim();
+                    var when = item.ReceivedAt == default
+                        ? ""
+                        : item.ReceivedAt.ToLocalTime().ToString("MM-dd HH:mm");
+                    var detail = string.IsNullOrEmpty(when) ? sender : $"{sender}  ·  {when}";
+                    return (name, detail);
+                })
+                .ToArray();
         }
         catch
         {
+            return [];
         }
-
-        return addresses;
     }
 
     private static bool IsChinese(string? language) =>
         !string.IsNullOrWhiteSpace(language)
             ? language.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
             : WidgetNative.UserLocale().StartsWith("zh", StringComparison.OrdinalIgnoreCase);
-}
 
-internal static partial class WidgetNative
-{
-    public static string UserLocale()
+    private static string FormatBytes(long bytes)
     {
-        Span<char> buffer = stackalloc char[85];
-        int length;
-        unsafe
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        var value = (double)Math.Max(bytes, 0);
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
         {
-            fixed (char* pointer = buffer)
-                length = GetUserDefaultLocaleName(pointer, buffer.Length);
+            value /= 1024;
+            unit++;
         }
 
-        return length <= 1 ? "en-US" : buffer[..(length - 1)].ToString();
+        return unit == 0 ? $"{value:0} {units[unit]}" : $"{value:0.##} {units[unit]}";
     }
-
-    [LibraryImport("kernel32.dll")]
-    private static unsafe partial int GetUserDefaultLocaleName(char* lpLocaleName, int cchLocaleName);
 }

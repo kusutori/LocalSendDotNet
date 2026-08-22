@@ -82,8 +82,15 @@ and crashes.
 Publish the unpackaged Native AOT layout first, copy the stamped
 `Package.appxmanifest` in as `AppxManifest.xml`, set its processor architecture
 and replace the generated `$targetentrypoint$` placeholder with
-`Windows.FullTrustApplication`, then pack and sign with the Windows SDK tools
-(`makeappx` / `signtool`). Do not use `winapp package` for this layout.
+`Windows.FullTrustApplication`, copy PNG/ICO assets, then build `resources.pri`
+with `tools/New-AotMsixResourcesPri.ps1` before packing. The unpackaged AOT
+publish only emits `Tonarink.pri`; Windows Shell reads package logos from
+`resources.pri`. Without it the taskbar falls back to a plated
+`Square44x44Logo`. That PRI must be a full merged resource map (app + WinUI +
+qualified assets), named after the package identity. A PNG-only
+`resources.pri` becomes the package primary map and WinUI fail-fasts at
+startup (`Microsoft.UI.Xaml.dll`, `0xc000027b`) before any window appears.
+Do not use `winapp package` for this layout.
 
 ```powershell
 dotnet publish src/Tonarink.App/Tonarink.App.csproj -c Release `
@@ -93,6 +100,10 @@ dotnet publish src/Tonarink.App/Tonarink.App.csproj -c Release `
 
 Copy-Item src/Tonarink.App/Package.appxmanifest `
   artifacts/publish/native-aot/win-x64/AppxManifest.xml
+Copy-Item src/Tonarink.App/Assets/*.png, src/Tonarink.App/Assets/*.ico `
+  artifacts/publish/native-aot/win-x64/Assets
+./tools/New-AotMsixResourcesPri.ps1 `
+  -LayoutPath artifacts/publish/native-aot/win-x64
 
 makeappx pack /o /d artifacts/publish/native-aot/win-x64 `
   /p artifacts/Tonarink-win-x64-aot.msix

@@ -343,6 +343,7 @@ jobs:
           $assets = Join-Path $layout 'Assets'
           New-Item -ItemType Directory -Path $assets -Force | Out-Null
           Copy-Item 'src/Tonarink.App/Assets/*.png' -Destination $assets
+          Copy-Item 'src/Tonarink.App/Assets/*.ico' -Destination $assets
           Copy-Item $env:APP_MANIFEST -Destination (Join-Path $layout 'AppxManifest.xml')
 
           $manifestPath = Join-Path $layout 'AppxManifest.xml'
@@ -358,6 +359,11 @@ jobs:
           }
           finally {
             $writer.Dispose()
+          }
+
+          ./tools/New-AotMsixResourcesPri.ps1 -LayoutPath $layout
+          if (-not (Test-Path (Join-Path $layout 'resources.pri'))) {
+            throw 'AOT MSIX layout is missing resources.pri.'
           }
 
       - name: Pack and sign Native AOT MSIX

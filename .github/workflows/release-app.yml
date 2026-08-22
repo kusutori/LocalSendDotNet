@@ -61,11 +61,10 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Restore
-        run: >-
-          dotnet restore ${{ env.APP_PROJECT }}
-          -p:Platform=${{ matrix.platform }}
-          -p:NativeAot=true
-          -r ${{ matrix.rid }}
+        run: |
+          dotnet restore ${{ env.APP_PROJECT }} -p:Platform=${{ matrix.platform }} -p:NativeAot=true -r ${{ matrix.rid }}
+          dotnet restore src/Tonarink.ExplorerCommand/Tonarink.ExplorerCommand.csproj -p:Platform=${{ matrix.platform }} -r ${{ matrix.rid }}
+          dotnet restore src/Tonarink.WidgetProvider/Tonarink.WidgetProvider.csproj -p:Platform=${{ matrix.platform }} -r ${{ matrix.rid }}
 
       - name: Publish Native AOT application
         shell: pwsh
@@ -184,11 +183,10 @@ jobs:
           "pfx=$certificatePath" >> $env:GITHUB_OUTPUT
 
       - name: Restore
-        run: >-
-          dotnet restore ${{ env.APP_PROJECT }}
-          -p:Platform=${{ matrix.platform }}
-          -p:RuntimeIdentifier=${{ matrix.rid }}
-          -p:TonarinkPackaged=true
+        run: |
+          dotnet restore ${{ env.APP_PROJECT }} -p:Platform=${{ matrix.platform }} -p:RuntimeIdentifier=${{ matrix.rid }} -p:TonarinkPackaged=true
+          dotnet restore src/Tonarink.ExplorerCommand/Tonarink.ExplorerCommand.csproj -p:Platform=${{ matrix.platform }} -r ${{ matrix.rid }}
+          dotnet restore src/Tonarink.WidgetProvider/Tonarink.WidgetProvider.csproj -p:Platform=${{ matrix.platform }} -r ${{ matrix.rid }}
 
       - name: Build signed MSIX
         shell: pwsh
@@ -354,11 +352,10 @@ jobs:
           "cer=$publicCertificatePath" >> $env:GITHUB_OUTPUT
 
       - name: Restore Native AOT application
-        run: >-
-          dotnet restore ${{ env.APP_PROJECT }}
-          -p:Platform=${{ matrix.platform }}
-          -p:NativeAot=true
-          -r ${{ matrix.rid }}
+        run: |
+          dotnet restore ${{ env.APP_PROJECT }} -p:Platform=${{ matrix.platform }} -p:NativeAot=true -r ${{ matrix.rid }}
+          dotnet restore src/Tonarink.ExplorerCommand/Tonarink.ExplorerCommand.csproj -p:Platform=${{ matrix.platform }} -r ${{ matrix.rid }}
+          dotnet restore src/Tonarink.WidgetProvider/Tonarink.WidgetProvider.csproj -p:Platform=${{ matrix.platform }} -r ${{ matrix.rid }}
 
       - name: Publish Native AOT layout
         shell: pwsh

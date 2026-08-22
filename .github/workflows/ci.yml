@@ -32,9 +32,14 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore src/Tonarink.App/Tonarink.App.csproj -p:Platform=x64
       - run: dotnet restore src/Tonarink.ExplorerCommand/Tonarink.ExplorerCommand.csproj -p:Platform=x64 -r win-x64
+      - run: dotnet restore src/Tonarink.WidgetProvider/Tonarink.WidgetProvider.csproj -p:Platform=x64 -r win-x64
       - run: dotnet format src/Tonarink.App/Tonarink.App.csproj --no-restore --verify-no-changes
       - run: dotnet format src/Tonarink.ExplorerCommand/Tonarink.ExplorerCommand.csproj --no-restore --verify-no-changes
+      - run: dotnet format src/Tonarink.WidgetProvider/Tonarink.WidgetProvider.csproj --no-restore --verify-no-changes
       - run: dotnet build src/Tonarink.App/Tonarink.App.csproj --no-restore --configuration Release -p:Platform=x64
       - run: >-
           dotnet publish src/Tonarink.ExplorerCommand/Tonarink.ExplorerCommand.csproj
+          --no-restore --configuration Release -r win-x64 -p:Platform=x64
+      - run: >-
+          dotnet publish src/Tonarink.WidgetProvider/Tonarink.WidgetProvider.csproj
           --no-restore --configuration Release -r win-x64 -p:Platform=x64

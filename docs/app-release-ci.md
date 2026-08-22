@@ -5,6 +5,7 @@ The `Tonarink GitHub Release` workflow creates these Windows assets for x64 and 
 - a self-contained Native AOT portable ZIP;
 - a separate native-symbols ZIP;
 - a signed managed MSIX sideload ZIP (`Tonarink-<version>-<platform>-msix.zip`);
+- a signed managed Widgets MSIX sideload ZIP (`Tonarink-<version>-<platform>-widgets-msix.zip`);
 - a signed Native AOT MSIX sideload ZIP (`Tonarink-<version>-<platform>-aot-msix.zip`).
 
 Managed MSIX ZIPs are the standard Visual Studio `*_Test` AppPackages folder
@@ -13,9 +14,10 @@ contain the hand-packed native layout, signed `.msix`, public certificate, and
 the repository's `Install-MsixSideload.ps1` as `Install.ps1`.
 
 Each generated GitHub Release begins with a bilingual Markdown table explaining
-the six application packages. Standard managed MSIX is recommended for most
-users; the portable and AOT MSIX variants are available for users who specifically
-want a native build. Symbol ZIPs are identified as debugging-only downloads.
+the application packages. Standard managed MSIX is recommended for most users;
+the Widgets ZIP is an optional larger build that registers a Windows 11 widget
+provider. Portable and AOT MSIX variants are native builds without widgets.
+Symbol ZIPs are identified as debugging-only downloads.
 
 The workflow runs for tags in `app-vMAJOR.MINOR.PATCH` or
 `app-vMAJOR.MINOR.PATCH.REVISION` form and can also be started manually. The `app-`

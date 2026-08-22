@@ -105,7 +105,7 @@ jobs:
           if-no-files-found: error
 
   signed-msix:
-    name: Build signed MSIX ${{ matrix.platform }}
+    name: Build signed MSIX ${{ matrix.platform }}${{ matrix.suffix }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -113,8 +113,20 @@ jobs:
         include:
           - platform: x64
             rid: win-x64
+            widgets: false
+            suffix: ""
           - platform: ARM64
             rid: win-arm64
+            widgets: false
+            suffix: ""
+          - platform: x64
+            rid: win-x64
+            widgets: true
+            suffix: "-widgets"
+          - platform: ARM64
+            rid: win-arm64
+            widgets: true
+            suffix: "-widgets"
 
     steps:
       - name: Check out repository
@@ -187,19 +199,22 @@ jobs:
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
         run: |
           $releaseVersion = $env:PACKAGE_VERSION -replace '\.0$', ''
-          $archive = Join-Path $env:RUNNER_TEMP "Tonarink-$releaseVersion-$env:PLATFORM-msix.zip"
+          $suffix = '${{ matrix.suffix }}'
+          $archive = Join-Path $env:RUNNER_TEMP "Tonarink-$releaseVersion-$env:PLATFORM$suffix-msix.zip"
           $packageDir = Join-Path $env:RUNNER_TEMP 'AppPackages\'
+          $widgets = '${{ matrix.widgets }}'
           dotnet build $env:APP_PROJECT --no-restore -c Release `
             -p:Platform=$env:PLATFORM `
             -p:RuntimeIdentifier=$env:RID `
             -p:TonarinkPackaged=true `
+            -p:TonarinkWidgets=$widgets `
             -p:GenerateAppxPackageOnBuild=true `
             -p:GenerateTestArtifacts=true `
             -p:AppxPackageSigningEnabled=true `
             -p:PackageCertificateThumbprint=$env:THUMBPRINT `
             -p:AppxPackageDir=$packageDir
           if ($LASTEXITCODE -ne 0) {
-            throw "Packaging the $env:PLATFORM MSIX failed."
+            throw "Packaging the $env:PLATFORM$suffix MSIX failed."
           }
 
           $packageFolder = Get-ChildItem $packageDir -Directory -Recurse |
@@ -214,8 +229,24 @@ jobs:
               throw "The package folder is missing $requiredName."
             }
           }
-          if (-not (Get-ChildItem $packageFolder.FullName -Filter *.msix)) {
+          $msix = Get-ChildItem $packageFolder.FullName -Filter *.msix | Select-Object -First 1
+          if ($null -eq $msix) {
             throw 'The package folder is missing an MSIX file.'
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead($msix.FullName)
+          try {
+            $hasWidget = [bool]($zip.Entries.FullName | Where-Object { $_ -match 'WidgetProvider[/\\]Tonarink\.WidgetProvider\.exe$' })
+          }
+          finally {
+            $zip.Dispose()
+          }
+          if ($widgets -eq 'true' -and -not $hasWidget) {
+            throw 'The Widgets MSIX is missing Tonarink.WidgetProvider.exe.'
+          }
+          if ($widgets -ne 'true' -and $hasWidget) {
+            throw 'The default MSIX must not include Tonarink.WidgetProvider.exe.'
           }
 
           Compress-Archive -Path $packageFolder.FullName -DestinationPath $archive -CompressionLevel Optimal
@@ -223,8 +254,8 @@ jobs:
       - name: Upload signed package
         uses: actions/upload-artifact@v4
         with:
-          name: signed-msix-${{ matrix.platform }}
-          path: ${{ runner.temp }}/Tonarink-*-${{ matrix.platform }}-msix.zip
+          name: signed-msix-${{ matrix.platform }}${{ matrix.suffix }}
+          path: ${{ runner.temp }}/Tonarink-*-${{ matrix.platform }}${{ matrix.suffix }}-msix.zip
           if-no-files-found: error
 
       - name: Remove signing certificate
@@ -335,6 +366,9 @@ jobs:
             if (-not (Test-Path (Join-Path $layout $requiredFile))) {
               throw "Native AOT layout is missing $requiredFile."
             }
+          }
+          if (Test-Path (Join-Path $layout 'WidgetProvider\Tonarink.WidgetProvider.exe')) {
+            throw 'The default Native AOT MSIX must not include the Widgets COM host.'
           }
 
           Get-ChildItem -LiteralPath $layout -Filter '*.pdb' -File |
@@ -464,6 +498,8 @@ jobs:
             | --- | --- | --- |
             | `Tonarink-<version>-x64-msix.zip` | x64 | **Recommended for most Intel/AMD Windows PCs.** Signed MSIX with the standard managed build. / 推荐大多数 Intel/AMD Windows 电脑使用。 |
             | `Tonarink-<version>-ARM64-msix.zip` | ARM64 | **Recommended for Windows on Arm.** Signed MSIX with the standard managed build. / 推荐骁龙等 ARM64 Windows 设备使用。 |
+            | `Tonarink-<version>-x64-widgets-msix.zip` | x64 | Optional larger build that registers a Windows 11 widget. Same package identity as the standard MSIX. / 可选的带小组件版本，体积更大。 |
+            | `Tonarink-<version>-ARM64-widgets-msix.zip` | ARM64 | Optional Widgets MSIX for Windows on Arm. / ARM64 带小组件的可选安装包。 |
             | `Tonarink-<version>-x64-aot-msix.zip` | x64 | Installed Native AOT build with faster startup and no separate .NET runtime requirement. / 安装版 Native AOT。 |
             | `Tonarink-<version>-ARM64-aot-msix.zip` | ARM64 | Native AOT MSIX for Windows on Arm. / ARM64 安装版 Native AOT。 |
             | `Tonarink-<version>-x64-portable.zip` | x64 | Native AOT build that runs without installation. / 无需安装的 x64 便携版。 |

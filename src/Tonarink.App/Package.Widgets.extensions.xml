@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Extensions
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3">
+  <com:Extension Category="windows.comServer">
+    <com:ComServer>
+      <com:ExeServer
+        Executable="WidgetProvider\Tonarink.WidgetProvider.exe"
+        Arguments="-RegisterProcessAsComServer"
+        DisplayName="Tonarink Widget Provider">
+        <com:Class
+          Id="C4A91E3B-6F27-4D8A-9B15-E0D2C7A84F36"
+          DisplayName="Tonarink Widget Provider" />
+      </com:ExeServer>
+    </com:ComServer>
+  </com:Extension>
+  <uap3:Extension Category="windows.appExtension">
+    <uap3:AppExtension
+      Name="com.microsoft.windows.widgets"
+      DisplayName="Tonarink"
+      Id="Tonarink.Widgets"
+      PublicFolder="Public">
+      <uap3:Properties>
+        <WidgetProvider>
+          <ProviderIcons>
+            <Icon Path="Assets\StoreLogo.png" />
+          </ProviderIcons>
+          <Activation>
+            <CreateInstance ClassId="C4A91E3B-6F27-4D8A-9B15-E0D2C7A84F36" />
+          </Activation>
+          <Definitions>
+            <Definition
+              Id="Tonarink_Receive"
+              DisplayName="Tonarink"
+              Description="Show this PC name and address so nearby devices can send files."
+              AllowMultiple="true">
+              <Capabilities>
+                <Capability>
+                  <Size Name="small" />
+                </Capability>
+                <Capability>
+                  <Size Name="medium" />
+                </Capability>
+                <Capability>
+                  <Size Name="large" />
+                </Capability>
+              </Capabilities>
+              <ThemeResources>
+                <Icons>
+                  <Icon Path="WidgetProvider\WidgetAssets\Icon.png" />
+                </Icons>
+                <Screenshots>
+                  <Screenshot Path="WidgetProvider\WidgetAssets\Screenshot.png" DisplayAltText="Tonarink widget" />
+                </Screenshots>
+                <DarkMode />
+                <LightMode />
+              </ThemeResources>
+            </Definition>
+          </Definitions>
+        </WidgetProvider>
+      </uap3:Properties>
+    </uap3:AppExtension>
+  </uap3:Extension>
+</Extensions>

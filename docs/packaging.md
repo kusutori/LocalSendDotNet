@@ -47,6 +47,17 @@ This produces an unsigned package under the app project's `AppPackages` director
 It is suitable for validating the package layout, but Windows will not install it
 until it is signed.
 
+The default package does **not** include Windows 11 widgets. To build the larger
+widgets flavor (same package identity, includes `Tonarink.WidgetProvider`):
+
+```powershell
+dotnet build src/Tonarink.App/Tonarink.App.csproj -c Release `
+  -p:Platform=x64 `
+  -p:TonarinkPackaged=true `
+  -p:TonarinkWidgets=true `
+  -p:GenerateAppxPackageOnBuild=true
+```
+
 For a sideloadable build, set `Package.appxmanifest`'s `Identity Publisher` to the
 exact subject of the signing certificate and add:
 
@@ -90,6 +101,10 @@ publish only emits `Tonarink.pri`; Windows Shell reads package logos from
 qualified assets), named after the package identity. A PNG-only
 `resources.pri` becomes the package primary map and WinUI fail-fasts at
 startup (`Microsoft.UI.Xaml.dll`, `0xc000027b`) before any window appears.
+Windows 11 widgets are **not** in the default package. They add a
+self-contained COM host under `WidgetProvider\` (~90 MB). Opt in with
+`-p:TonarinkWidgets=true` on a packaged build; that injects
+`Package.Widgets.extensions.xml` into the manifest and copies the provider.
 Do not use `winapp package` for this layout.
 
 ```powershell

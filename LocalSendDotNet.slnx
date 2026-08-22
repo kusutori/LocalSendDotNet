@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Tonarink.App/Tonarink.App.csproj" />
     <Project Path="src/Tonarink.ExplorerCommand/Tonarink.ExplorerCommand.csproj" />
+    <Project Path="src/Tonarink.WidgetProvider/Tonarink.WidgetProvider.csproj" />
     <Project Path="src/LocalSendDotNet.Core/LocalSendDotNet.Core.csproj" />
     <Project Path="src/LocalSendDotNet.Cli/LocalSendDotNet.Cli.csproj" />
   </Folder>

@@ -17,6 +17,22 @@ static class AppPlatform
 
     public static string DataDirectory => DataDirectoryValue.Value;
 
+    public static string SharedDataDirectory =>
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            UnpackagedPublisher,
+            UnpackagedProduct);
+
+    public static string ExplorerShareDirectory
+    {
+        get
+        {
+            var directory = Path.Combine(SharedDataDirectory, "explorer-share");
+            Directory.CreateDirectory(directory);
+            return directory;
+        }
+    }
+
     public static string DefaultDownloadDirectory => DefaultDownloadDirectoryValue.Value;
 
     public static bool StartHidden { get; } = DetectStartHidden();

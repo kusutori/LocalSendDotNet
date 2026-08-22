@@ -215,6 +215,8 @@
   <data name="SettingsStopServer" xml:space="preserve"><value>停止服务器</value></data>
   <data name="SettingsStartWithWindows" xml:space="preserve"><value>登录系统后自动启动</value></data>
   <data name="SettingsStartWithWindowsDescription" xml:space="preserve"><value>登录 Windows 后自动运行 Tonarink。</value></data>
+  <data name="SettingsExplorerContextMenu" xml:space="preserve"><value>在文件资源管理器中显示</value></data>
+  <data name="SettingsExplorerContextMenuDescription" xml:space="preserve"><value>在 Windows 11 右键菜单中加入“使用 Tonarink 发送”。安装打包版本后生效。</value></data>
   <data name="StartupDisabledByPolicy" xml:space="preserve"><value>当前 Windows 策略禁止 Tonarink 在登录后自动启动。</value></data>
   <data name="StartupDisabledByUser" xml:space="preserve"><value>已在 Windows 设置中关闭开机启动。请先在系统设置里启用 Tonarink，然后再试。</value></data>
   <data name="StartupFailed" xml:space="preserve"><value>无法更新登录后自动启动：{error}</value></data>

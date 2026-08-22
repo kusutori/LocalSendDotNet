@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <OutputType>Library</OutputType>
+        <AssemblyName>Tonarink.ExplorerCommand</AssemblyName>
+        <RootNamespace>Tonarink.ExplorerCommand</RootNamespace>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <PublishAot>true</PublishAot>
+        <NativeLib>Shared</NativeLib>
+        <SelfContained>true</SelfContained>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
+        <IsAotCompatible>true</IsAotCompatible>
+        <Platforms>x64;ARM64</Platforms>
+        <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And ('$(Platform)' == 'ARM64' Or '$(Platform)' == 'arm64')">win-arm64</RuntimeIdentifier>
+        <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+        <OptimizationPreference>Size</OptimizationPreference>
+        <StackTraceSupport>false</StackTraceSupport>
+        <UseSystemResourceKeys>true</UseSystemResourceKeys>
+        <ApplicationIcon>..\Tonarink.App\Assets\AppIcon.ico</ApplicationIcon>
+    </PropertyGroup>
+
+</Project>

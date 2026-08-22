@@ -10,11 +10,16 @@ static class ShareTargetActivationBroker
 {
     private const string InstanceKey = "Tonarink.Primary";
     private const string IngestedEventName = @"Local\Tonarink.ShareIngested";
+    private const string ShareEventName = @"Local\Tonarink.ExplorerShare";
     private static readonly ConcurrentQueue<ShareTargetPayload> PendingPayloads = new();
     private static readonly EventWaitHandle Ingested = new(
         initialState: true,
         mode: EventResetMode.ManualReset,
         name: IngestedEventName);
+    private static readonly object ExplorerShareGate = new();
+    private static FileSystemWatcher? ExplorerShareWatcher;
+    private static EventWaitHandle? ExplorerShareEvent;
+    private static RegisteredWaitHandle? ExplorerShareWait;
 
     public static event EventHandler? ActivationReceived;
 
@@ -23,7 +28,11 @@ static class ShareTargetActivationBroker
     public static async Task<bool> RedirectToPrimaryInstanceAsync()
     {
         if (!AppPlatform.HasPackageIdentity())
+        {
+            DrainExplorerShare();
+            StartExplorerShareWatch();
             return false;
+        }
 
         var current = AppInstance.GetCurrent();
         var primary = AppInstance.FindOrRegisterForKey(InstanceKey);
@@ -37,6 +46,7 @@ static class ShareTargetActivationBroker
 
         primary.Activated += OnActivated;
         await IngestAsync(current.GetActivatedEventArgs()).ConfigureAwait(true);
+        StartExplorerShareWatch();
         return false;
     }
 
@@ -63,6 +73,7 @@ static class ShareTargetActivationBroker
         }
         finally
         {
+            DrainExplorerShare();
             try
             {
                 Ingested.Set();
@@ -73,6 +84,81 @@ static class ShareTargetActivationBroker
 
             ActivationReceived?.Invoke(null, EventArgs.Empty);
         }
+    }
+
+    private static void StartExplorerShareWatch()
+    {
+        if (ExplorerShareWatcher is not null)
+            return;
+
+        var directory = AppPlatform.ExplorerShareDirectory;
+        DrainExplorerShare();
+        var watcher = new FileSystemWatcher(directory)
+        {
+            Filter = "*.txt",
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime,
+            EnableRaisingEvents = true,
+        };
+        watcher.Created += (_, _) => DrainExplorerShare();
+        watcher.Changed += (_, _) => DrainExplorerShare();
+        watcher.Renamed += (_, _) => DrainExplorerShare();
+        ExplorerShareWatcher = watcher;
+
+        ExplorerShareEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShareEventName);
+        ExplorerShareWait = ThreadPool.RegisterWaitForSingleObject(
+            ExplorerShareEvent,
+            static (_, _) => DrainExplorerShare(),
+            null,
+            -1,
+            executeOnlyOnce: false);
+    }
+
+    private static void DrainExplorerShare()
+    {
+        var directory = AppPlatform.ExplorerShareDirectory;
+        if (!Directory.Exists(directory))
+            return;
+
+        var ingested = false;
+        lock (ExplorerShareGate)
+        {
+            foreach (var file in Directory.GetFiles(directory, "*.txt"))
+            {
+                try
+                {
+                    string[] paths;
+                    try
+                    {
+                        paths = File.ReadAllLines(file)
+                            .Select(static path => path.Trim())
+                            .Where(static path => path.Length > 0 && Path.Exists(path))
+                            .ToArray();
+                    }
+                    catch (IOException)
+                    {
+                        continue;
+                    }
+
+                    File.Delete(file);
+                    if (paths.Length == 0)
+                        continue;
+
+                    var items = paths
+                        .Select(static path => (ShareTargetItem)new ShareTargetItem.FileSystem(
+                            path,
+                            Directory.Exists(path)))
+                        .ToArray();
+                    PendingPayloads.Enqueue(new ShareTargetPayload(Guid.NewGuid(), items));
+                    ingested = true;
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        if (ingested)
+            ActivationReceived?.Invoke(null, EventArgs.Empty);
     }
 
     private static Task<ShareTargetPayload?> CaptureSharePayloadAsync(

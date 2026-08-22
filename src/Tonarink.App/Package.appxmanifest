@@ -3,8 +3,11 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap5 rescap">
+  IgnorableNamespaces="uap uap5 rescap com desktop4 desktop5">
 
   <Identity Name="Tonarink.App" Publisher="CN=kusutori" Version="0.1.9.0" />
 
@@ -49,6 +52,11 @@
             <uap:DataFormat>Uri</uap:DataFormat>
           </uap:ShareTarget>
         </uap:Extension>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="tonarink">
+            <uap:DisplayName>Tonarink</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
         <uap5:Extension
           Category="windows.startupTask"
           Executable="Tonarink.exe"
@@ -58,6 +66,32 @@
             Enabled="false"
             DisplayName="Tonarink" />
         </uap5:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:SurrogateServer
+              DisplayName="Tonarink"
+              AppId="8840B22A-3B9C-4C12-A7D5-3019438A5F1F">
+              <com:Class
+                Id="8840B22A-3B9C-4C12-A7D5-3019438A5F1F"
+                Path="Tonarink.ExplorerCommand.dll"
+                ThreadingModel="STA" />
+            </com:SurrogateServer>
+          </com:ComServer>
+        </com:Extension>
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop5:ItemType Type="*">
+              <desktop5:Verb
+                Id="SendWithTonarink"
+                Clsid="8840B22A-3B9C-4C12-A7D5-3019438A5F1F" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory">
+              <desktop5:Verb
+                Id="SendWithTonarink"
+                Clsid="8840B22A-3B9C-4C12-A7D5-3019438A5F1F" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
       </Extensions>
     </Application>
   </Applications>

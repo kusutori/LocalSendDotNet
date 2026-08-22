@@ -113,7 +113,16 @@ sealed class SettingsPage : Component<SettingsPageProps>
                 isActionIconVisible: false,
                 content:
                 ToggleSwitch(Props.Settings.StartWithWindows, value =>
-                    _ = SetStartupAsync(value))));
+                    _ = SetStartupAsync(value))),
+            SettingsCard(
+                header: t.Message(new("App", "SettingsExplorerContextMenu")),
+                description: t.Message(new("App", "SettingsExplorerContextMenuDescription")),
+                headerIcon: HeaderGlyph("\uE8A5"),
+                isClickEnabled: false,
+                isActionIconVisible: false,
+                content:
+                ToggleSwitch(Props.Settings.ShowExplorerContextMenu, value =>
+                    Props.UpdateSettings(settings => settings with { ShowExplorerContextMenu = value }))));
 
         var receiveCards = SettingsGroup(
             t.Message(new("App", "SettingsReceive")),

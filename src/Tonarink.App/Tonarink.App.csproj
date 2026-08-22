@@ -84,6 +84,31 @@
         <SelfContained>true</SelfContained>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <_ExplorerCommandProject>$(MSBuildThisFileDirectory)..\Tonarink.ExplorerCommand\Tonarink.ExplorerCommand.csproj</_ExplorerCommandProject>
+        <_ExplorerCommandRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_ExplorerCommandRid>
+        <_ExplorerCommandRid Condition="'$(_ExplorerCommandRid)' == '' And ('$(Platform)' == 'ARM64' Or '$(Platform)' == 'arm64')">win-arm64</_ExplorerCommandRid>
+        <_ExplorerCommandRid Condition="'$(_ExplorerCommandRid)' == ''">win-x64</_ExplorerCommandRid>
+        <_ExplorerCommandPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)explorer-command\$(_ExplorerCommandRid)\'))</_ExplorerCommandPublishDir>
+    </PropertyGroup>
+
+    <Target Name="PublishTonarinkExplorerCommand"
+            BeforeTargets="BeforeBuild;AssignTargetPaths;GetCopyToPublishDirectoryItems"
+            Condition="'$(TonarinkPackaged)' == 'true' Or '$(PublishAot)' == 'true' Or '$(NativeAot)' == 'true'">
+        <MSBuild
+            Projects="$(_ExplorerCommandProject)"
+            Targets="Publish"
+            Properties="Configuration=$(Configuration);RuntimeIdentifier=$(_ExplorerCommandRid);Platform=$(Platform);PublishDir=$(_ExplorerCommandPublishDir);PublishAot=true;NativeLib=Shared;SelfContained=true" />
+        <ItemGroup>
+            <Content Include="$(_ExplorerCommandPublishDir)Tonarink.ExplorerCommand.dll"
+                     Condition="Exists('$(_ExplorerCommandPublishDir)Tonarink.ExplorerCommand.dll')">
+                <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+                <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+                <Link>Tonarink.ExplorerCommand.dll</Link>
+            </Content>
+        </ItemGroup>
+    </Target>
+
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
         <PackageReference Include="CommunityToolkit.WinUI.Controls.Segmented" />

@@ -35,7 +35,8 @@ sealed record AppSettings(
     bool EnableHttps,
     string MulticastGroup,
     IReadOnlyList<string>? NetworkWhitelist,
-    IReadOnlyList<string>? NetworkBlacklist)
+    IReadOnlyList<string>? NetworkBlacklist,
+    bool ShowExplorerContextMenu)
 {
     public static readonly AppSettings Default = new(
         Alias: string.IsNullOrWhiteSpace(Environment.UserName) ? Environment.MachineName : Environment.UserName,
@@ -53,7 +54,8 @@ sealed record AppSettings(
         EnableHttps: true,
         MulticastGroup: LocalSendOptions.DefaultMulticastAddress.ToString(),
         NetworkWhitelist: null,
-        NetworkBlacklist: null);
+        NetworkBlacklist: null,
+        ShowExplorerContextMenu: true);
 
     public string ResolvedAlias =>
         string.IsNullOrWhiteSpace(Alias) ? Default.Alias : Alias.Trim();

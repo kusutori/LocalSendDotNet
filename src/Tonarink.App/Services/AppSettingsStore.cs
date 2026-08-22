@@ -61,6 +61,7 @@ sealed class AppSettingsFile
     public string? MulticastGroup { get; set; }
     public string[]? NetworkWhitelist { get; set; }
     public string[]? NetworkBlacklist { get; set; }
+    public bool? ShowExplorerContextMenu { get; set; }
 
     public static AppSettingsFile FromSettings(AppSettings settings) => new()
     {
@@ -80,6 +81,7 @@ sealed class AppSettingsFile
         MulticastGroup = settings.MulticastGroup,
         NetworkWhitelist = Copy(settings.NetworkWhitelist),
         NetworkBlacklist = Copy(settings.NetworkBlacklist),
+        ShowExplorerContextMenu = settings.ShowExplorerContextMenu,
     };
 
     public AppSettings ToSettings()
@@ -113,6 +115,7 @@ sealed class AppSettingsFile
             MulticastGroup = IsMulticastGroup(MulticastGroup) ? MulticastGroup! : defaults.MulticastGroup,
             NetworkWhitelist = Copy(NetworkWhitelist),
             NetworkBlacklist = NetworkWhitelist is null ? Copy(NetworkBlacklist) : null,
+            ShowExplorerContextMenu = ShowExplorerContextMenu ?? defaults.ShowExplorerContextMenu,
         };
     }
 

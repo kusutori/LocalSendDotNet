@@ -2,29 +2,46 @@ using System.Runtime.InteropServices;
 using Tonarink.WidgetProvider;
 using WinRT;
 
-internal static class Program
+internal static partial class Program
 {
-    private const string ComServerArgument = "-RegisterProcessAsComServer";
+    private const uint CowaitDispatchCalls = 0x8;
+    private const uint CowaitDispatchWindowMessages = 0x10;
+    private const uint Infinite = 0xFFFFFFFF;
 
-    [DllImport("kernel32.dll")]
-    private static extern nint GetConsoleWindow();
+    [LibraryImport("ole32.dll")]
+    private static unsafe partial int CoWaitForMultipleHandles(
+        uint dwFlags,
+        uint dwTimeout,
+        uint cHandles,
+        nint* pHandles,
+        out uint lpdwindex);
 
     [MTAThread]
-    private static void Main(string[] args)
+    private static unsafe void Main(string[] args)
     {
-        if (args.Length == 0 || !string.Equals(args[0], ComServerArgument, StringComparison.Ordinal))
-            return;
-
-        ComWrappersSupport.InitializeComWrappers();
-        using (ComServer.Register<WidgetProvider>())
+        WidgetLog.Write($"start args=[{string.Join(" | ", args)}] dir={AppContext.BaseDirectory}");
+        if (!args.Any(static argument => argument.Contains("RegisterProcessAsComServer", StringComparison.OrdinalIgnoreCase)))
         {
-            if (GetConsoleWindow() != 0)
-            {
-                Console.ReadLine();
-                return;
-            }
+            WidgetLog.Write("exit: not a COM server launch");
+            return;
+        }
 
-            WidgetProvider.Idle.WaitOne();
+        try
+        {
+            ComWrappersSupport.InitializeComWrappers();
+            WidgetLog.Write("ComWrappers initialized");
+            using (ComServer.Register())
+            {
+                WidgetLog.Write("class object registered");
+                var handle = WidgetProvider.Idle.SafeWaitHandle.DangerousGetHandle();
+                var flags = CowaitDispatchCalls | CowaitDispatchWindowMessages;
+                var result = CoWaitForMultipleHandles(flags, Infinite, 1, &handle, out _);
+                WidgetLog.Write($"wait finished hr=0x{result:X8}");
+            }
+        }
+        catch (Exception exception)
+        {
+            WidgetLog.Write($"fatal {exception}");
         }
     }
 }

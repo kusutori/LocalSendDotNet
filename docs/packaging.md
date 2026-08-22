@@ -101,10 +101,12 @@ publish only emits `Tonarink.pri`; Windows Shell reads package logos from
 qualified assets), named after the package identity. A PNG-only
 `resources.pri` becomes the package primary map and WinUI fail-fasts at
 startup (`Microsoft.UI.Xaml.dll`, `0xc000027b`) before any window appears.
-Windows 11 widgets are **not** in the default package. They add a
-self-contained COM host under `WidgetProvider\` (~90 MB). Opt in with
+Windows 11 widgets are **not** in the default package. Opt in with
 `-p:TonarinkWidgets=true` on a packaged build; that injects
-`Package.Widgets.extensions.xml` into the manifest and copies the provider.
+`Package.Widgets.extensions.xml` into the manifest and copies a Native AOT
+`Tonarink.WidgetProvider.exe` (~3 MB) plus templates and icons. The host
+shares the package's Windows App SDK runtime instead of bundling a second
+copy.
 Do not use `winapp package` for this layout.
 
 ```powershell

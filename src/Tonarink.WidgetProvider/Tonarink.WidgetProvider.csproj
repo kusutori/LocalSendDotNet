@@ -6,9 +6,18 @@
         <AssemblyName>Tonarink.WidgetProvider</AssemblyName>
         <RootNamespace>Tonarink.WidgetProvider</RootNamespace>
         <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <UseWinUI>false</UseWinUI>
         <WindowsPackageType>None</WindowsPackageType>
-        <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+        <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+        <PublishAot>true</PublishAot>
+        <SelfContained>true</SelfContained>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
+        <IsAotCompatible>true</IsAotCompatible>
+        <OptimizationPreference>Size</OptimizationPreference>
+        <StackTraceSupport>false</StackTraceSupport>
+        <UseSystemResourceKeys>true</UseSystemResourceKeys>
         <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
         <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
         <Platforms>x64;ARM64</Platforms>

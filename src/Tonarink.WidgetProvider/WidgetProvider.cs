@@ -3,30 +3,38 @@ using Microsoft.Windows.Widgets.Providers;
 
 namespace Tonarink.WidgetProvider;
 
-[ComVisible(true)]
-[ComDefaultInterface(typeof(IWidgetProvider))]
 [Guid(ComServer.Clsid)]
-public sealed class WidgetProvider : IWidgetProvider
+public sealed partial class WidgetProvider : IWidgetProvider
 {
     internal static readonly ManualResetEvent Idle = new(false);
     private static readonly Dictionary<string, ReceiveWidget> Instances = new(StringComparer.Ordinal);
     private static readonly object Gate = new();
     private static bool recovered;
 
-    public WidgetProvider() => Recover();
+    public WidgetProvider() => WidgetLog.Write("WidgetProvider constructed");
 
     public void CreateWidget(WidgetContext widgetContext)
     {
-        if (!string.Equals(widgetContext.DefinitionId, ReceiveWidget.DefinitionId, StringComparison.Ordinal))
-            throw new InvalidOperationException($"Unknown widget '{widgetContext.DefinitionId}'.");
-
-        lock (Gate)
+        try
         {
-            Instances[widgetContext.Id] = new ReceiveWidget(widgetContext.Id);
-            Idle.Reset();
-        }
+            WidgetLog.Write($"CreateWidget id={widgetContext.Id} definition={widgetContext.DefinitionId}");
+            if (!string.Equals(widgetContext.DefinitionId, ReceiveWidget.DefinitionId, StringComparison.Ordinal))
+                throw new InvalidOperationException($"Unknown widget '{widgetContext.DefinitionId}'.");
 
-        Push(widgetContext.Id, includeTemplate: true);
+            lock (Gate)
+            {
+                Instances[widgetContext.Id] = new ReceiveWidget(widgetContext.Id);
+                Idle.Reset();
+            }
+
+            Push(widgetContext.Id, includeTemplate: true);
+            WidgetLog.Write("CreateWidget pushed");
+        }
+        catch (Exception exception)
+        {
+            WidgetLog.Write($"CreateWidget failed {exception}");
+            throw;
+        }
     }
 
     public void DeleteWidget(string widgetId, string customState)
@@ -49,13 +57,17 @@ public sealed class WidgetProvider : IWidgetProvider
     public void OnWidgetContextChanged(WidgetContextChangedArgs contextChangedArgs) =>
         Push(contextChangedArgs.WidgetContext.Id, includeTemplate: false);
 
-    public void Activate(WidgetContext widgetContext) =>
+    public void Activate(WidgetContext widgetContext)
+    {
+        WidgetLog.Write($"Activate id={widgetContext.Id}");
         Push(widgetContext.Id, includeTemplate: true);
+    }
 
     public void Deactivate(string widgetId) => _ = widgetId;
 
     private static void Push(string widgetId, bool includeTemplate)
     {
+        Recover();
         lock (Gate)
         {
             if (!Instances.ContainsKey(widgetId))

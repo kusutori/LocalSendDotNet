@@ -4,7 +4,7 @@
         <!-- Keep the normal build unpackaged; opt into MSIX with -p:TonarinkPackaged=true. -->
         <TonarinkPackaged Condition="'$(TonarinkPackaged)' == ''">false</TonarinkPackaged>
         <NativeAot Condition="'$(NativeAot)' == ''">false</NativeAot>
-        <!-- Widgets add a self-contained COM host (~90 MB). Keep them off the default package. -->
+        <!-- Widgets add a Native AOT COM host. Keep them off the default package. -->
         <TonarinkWidgets Condition="'$(TonarinkWidgets)' == ''">false</TonarinkWidgets>
     </PropertyGroup>
 
@@ -129,19 +129,45 @@
         </ItemGroup>
     </Target>
 
+    <Target Name="CollectWidgetProviderPayload">
+        <ItemGroup>
+            <_WidgetProviderPayload Remove="@(_WidgetProviderPayload)" />
+            <_WidgetProviderPayload Include="$(_WidgetProviderPublishDir)Tonarink.WidgetProvider.exe">
+                <TargetPath>WidgetProvider\Tonarink.WidgetProvider.exe</TargetPath>
+            </_WidgetProviderPayload>
+            <_WidgetProviderPayload Include="$(_WidgetProviderPublishDir)Microsoft.WindowsAppRuntime.Bootstrap.dll"
+                                    Condition="Exists('$(_WidgetProviderPublishDir)Microsoft.WindowsAppRuntime.Bootstrap.dll')">
+                <TargetPath>WidgetProvider\Microsoft.WindowsAppRuntime.Bootstrap.dll</TargetPath>
+            </_WidgetProviderPayload>
+            <_WidgetProviderPayload Include="$(_WidgetProviderPublishDir)Microsoft.WindowsAppRuntime.dll"
+                                    Condition="Exists('$(_WidgetProviderPublishDir)Microsoft.WindowsAppRuntime.dll')">
+                <TargetPath>WidgetProvider\Microsoft.WindowsAppRuntime.dll</TargetPath>
+            </_WidgetProviderPayload>
+            <_WidgetProviderPayload Include="$(_WidgetProviderPublishDir)Microsoft.Windows.Widgets.dll"
+                                    Condition="Exists('$(_WidgetProviderPublishDir)Microsoft.Windows.Widgets.dll')">
+                <TargetPath>WidgetProvider\Microsoft.Windows.Widgets.dll</TargetPath>
+            </_WidgetProviderPayload>
+            <_WidgetProviderTemplate Include="$(_WidgetProviderPublishDir)Templates\*.json" />
+            <_WidgetProviderAsset Include="$(_WidgetProviderPublishDir)WidgetAssets\*.png" />
+            <_WidgetProviderPayload Include="@(_WidgetProviderTemplate)">
+                <TargetPath>WidgetProvider\Templates\%(Filename)%(Extension)</TargetPath>
+            </_WidgetProviderPayload>
+            <_WidgetProviderPayload Include="@(_WidgetProviderAsset)">
+                <TargetPath>WidgetProvider\WidgetAssets\%(Filename)%(Extension)</TargetPath>
+            </_WidgetProviderPayload>
+        </ItemGroup>
+    </Target>
+
     <Target Name="PublishTonarinkWidgetProvider"
             BeforeTargets="BeforeBuild;AssignTargetPaths"
             Condition="'$(TonarinkWidgets)' == 'true' And ('$(TonarinkPackaged)' == 'true' Or '$(PublishAot)' == 'true' Or '$(NativeAot)' == 'true')">
         <MSBuild
             Projects="$(_WidgetProviderProject)"
             Targets="Publish"
-            Properties="Configuration=$(Configuration);RuntimeIdentifier=$(_WidgetProviderRid);Platform=$(Platform);PublishDir=$(_WidgetProviderPublishDir);SelfContained=true;WindowsAppSDKSelfContained=true;WindowsPackageType=None;PublishAot=false" />
-        <ItemGroup>
-            <_WidgetProviderOutputFiles Include="$(_WidgetProviderPublishDir)**\*.*"
-                                        Exclude="$(_WidgetProviderPublishDir)**\*.pdb" />
-        </ItemGroup>
-        <Copy SourceFiles="@(_WidgetProviderOutputFiles)"
-              DestinationFiles="@(_WidgetProviderOutputFiles->'$(OutDir)WidgetProvider\%(RecursiveDir)%(Filename)%(Extension)')"
+            Properties="Configuration=$(Configuration);RuntimeIdentifier=$(_WidgetProviderRid);Platform=$(Platform);PublishDir=$(_WidgetProviderPublishDir);SelfContained=true;WindowsAppSDKSelfContained=true;WindowsPackageType=None;PublishAot=true" />
+        <CallTarget Targets="CollectWidgetProviderPayload" />
+        <Copy SourceFiles="@(_WidgetProviderPayload)"
+              DestinationFiles="@(_WidgetProviderPayload->'$(OutDir)%(TargetPath)')"
               SkipUnchangedFiles="true" />
         <MakeDir Directories="$(OutDir)Public" />
         <Copy SourceFiles="$(MSBuildThisFileDirectory)..\Tonarink.WidgetProvider\Public\.gitkeep"
@@ -152,12 +178,9 @@
     <Target Name="CopyTonarinkWidgetProviderToPublish"
             AfterTargets="Publish"
             Condition="'$(TonarinkWidgets)' == 'true' And ('$(TonarinkPackaged)' == 'true' Or '$(PublishAot)' == 'true' Or '$(NativeAot)' == 'true')">
-        <ItemGroup>
-            <_WidgetProviderPublishFiles Include="$(_WidgetProviderPublishDir)**\*.*"
-                                         Exclude="$(_WidgetProviderPublishDir)**\*.pdb" />
-        </ItemGroup>
-        <Copy SourceFiles="@(_WidgetProviderPublishFiles)"
-              DestinationFiles="@(_WidgetProviderPublishFiles->'$(PublishDir)WidgetProvider\%(RecursiveDir)%(Filename)%(Extension)')"
+        <CallTarget Targets="CollectWidgetProviderPayload" />
+        <Copy SourceFiles="@(_WidgetProviderPayload)"
+              DestinationFiles="@(_WidgetProviderPayload->'$(PublishDir)%(TargetPath)')"
               SkipUnchangedFiles="true" />
         <MakeDir Directories="$(PublishDir)Public" />
         <Copy SourceFiles="$(MSBuildThisFileDirectory)..\Tonarink.WidgetProvider\Public\.gitkeep"
@@ -167,13 +190,11 @@
 
     <Target Name="AddWidgetProviderAppxPayload"
             BeforeTargets="_ComputeAppxPackagePayload"
-            DependsOnTargets="PublishTonarinkWidgetProvider"
+            DependsOnTargets="PublishTonarinkWidgetProvider;CollectWidgetProviderPayload"
             Condition="'$(TonarinkWidgets)' == 'true' And '$(TonarinkPackaged)' == 'true'">
         <ItemGroup>
-            <_WidgetProviderPackageFiles Include="$(_WidgetProviderPublishDir)**\*.*"
-                                         Exclude="$(_WidgetProviderPublishDir)**\*.pdb" />
-            <AppxPackagePayload Include="@(_WidgetProviderPackageFiles)">
-                <TargetPath>WidgetProvider\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+            <AppxPackagePayload Include="@(_WidgetProviderPayload)">
+                <TargetPath>%(TargetPath)</TargetPath>
             </AppxPackagePayload>
             <AppxPackagePayload Include="$(MSBuildThisFileDirectory)..\Tonarink.WidgetProvider\Public\.gitkeep">
                 <TargetPath>Public\.gitkeep</TargetPath>

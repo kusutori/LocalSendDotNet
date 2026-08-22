@@ -1,7 +1,7 @@
-using System.Globalization;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace Tonarink.WidgetProvider;
@@ -37,14 +37,10 @@ internal sealed record WidgetSnapshot(
             OpenLabel: chinese ? "打开 Tonarink" : "Open Tonarink");
     }
 
-    public string ToJson() => JsonSerializer.Serialize(new Dictionary<string, string>
-    {
-        ["title"] = Title,
-        ["alias"] = Alias,
-        ["address"] = Address,
-        ["status"] = Status,
-        ["openLabel"] = OpenLabel,
-    });
+    public string ToJson() =>
+        $$"""{"title":{{Quote(Title)}},"alias":{{Quote(Alias)}},"address":{{Quote(Address)}},"status":{{Quote(Status)}},"openLabel":{{Quote(OpenLabel)}}}""";
+
+    private static string Quote(string value) => $"\"{JsonEncodedText.Encode(value)}\"";
 
     private static (string? Alias, int? Port, string? Language) ReadSettings()
     {
@@ -135,5 +131,24 @@ internal sealed record WidgetSnapshot(
     private static bool IsChinese(string? language) =>
         !string.IsNullOrWhiteSpace(language)
             ? language.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
-            : CultureInfo.CurrentUICulture.Name.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+            : WidgetNative.UserLocale().StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+}
+
+internal static partial class WidgetNative
+{
+    public static string UserLocale()
+    {
+        Span<char> buffer = stackalloc char[85];
+        int length;
+        unsafe
+        {
+            fixed (char* pointer = buffer)
+                length = GetUserDefaultLocaleName(pointer, buffer.Length);
+        }
+
+        return length <= 1 ? "en-US" : buffer[..(length - 1)].ToString();
+    }
+
+    [LibraryImport("kernel32.dll")]
+    private static unsafe partial int GetUserDefaultLocaleName(char* lpLocaleName, int cchLocaleName);
 }
